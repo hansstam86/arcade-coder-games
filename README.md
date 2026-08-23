@@ -141,6 +141,12 @@ python deck.py          # design your layout in the browser emulator
 echo deck_hw.py > launch_target.txt && open ArcadeMinesweeper.app   # real board
 ```
 
+While the deck runs it serves a **visual config editor at
+http://127.0.0.1:7788**: click a pad to edit or create a button, pick colour
+and action in the form, manage pages, and Save — the running deck hot-reloads
+`deck.json` within a second, so the physical board updates live. Hand-editing
+`deck.json` hot-reloads too.
+
 The example config: mute toggle (with live state), Music play/pause, volume
 up/down, screenshot-to-clipboard, display sleep, links, and an apps page.
 

@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ArcadeDeck Editor</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: #14161c; color: #9aa3b2;
+         font-family: system-ui, sans-serif; display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+           background: #1b1d24; border-bottom: 1px solid #262a34; }
+  header h1 { font-size: 15px; font-weight: 600; color: #d5dae4; margin: 0 8px 0 0; }
+  .spacer { flex: 1; }
+  button, select, input {
+    padding: 6px 10px; border: 1px solid #3a3f4c; border-radius: 8px;
+    background: #1d2027; color: #c6cdd9; font: 500 13px system-ui;
+  }
+  button { cursor: pointer; }
+  button:hover { background: #262b35; }
+  #save { background: #1d4a2b; border-color: #2c6e40; color: #b7eec6; }
+  #msg { font-size: 12px; opacity: .8; }
+  main { flex: 1; display: flex; gap: 24px; padding: 24px; flex-wrap: wrap; }
+  .grid { display: grid; grid-template-columns: repeat(12, 32px); gap: 5px;
+          background: #1b1d24; padding: 14px; border-radius: 12px; align-self: flex-start; }
+  .cell { width: 32px; height: 32px; border: 0; border-radius: 6px; background: #0a0b0f;
+          cursor: pointer; }
+  .cell.sel { outline: 2px solid #fff; outline-offset: 1px; }
+  form { display: flex; flex-direction: column; gap: 10px; min-width: 340px; max-width: 420px; }
+  form.hidden { display: none; }
+  label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  label span { width: 92px; opacity: .8; }
+  label input, label select { flex: 1; }
+  input[type=color] { padding: 2px; height: 32px; }
+  input[type=number] { width: 64px; flex: 0; }
+  fieldset { border: 1px solid #262a34; border-radius: 10px; display: flex;
+             flex-direction: column; gap: 8px; }
+  legend { font-size: 12px; padding: 0 6px; }
+  .row { display: flex; gap: 8px; }
+  .danger { border-color: #6e2c2c; color: #eeb7b7; }
+  .hint { font-size: 12px; opacity: .65; max-width: 420px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ArcadeDeck Editor</h1>
+  <select id="pageSel"></select>
+  <button id="addPage">+ page</button>
+  <button id="delPage" class="danger">delete page</button>
+  <div class="spacer"></div>
+  <span id="msg"></span>
+  <button id="save">&#10003; Save to board</button>
+</header>
+<main>
+  <div>
+    <div class="grid" id="grid"></div>
+    <p class="hint">Click a button to edit it, or an empty pad to create one there.
+      Saving updates the physical board within a second.</p>
+  </div>
+  <form id="form" class="hidden" onsubmit="return false">
+    <label><span>label</span><input id="f_label"></label>
+    <div class="row">
+      <label><span>x</span><input id="f_x" type="number" min="0" max="11"></label>
+      <label><span>y</span><input id="f_y" type="number" min="0" max="11"></label>
+      <label><span>w</span><input id="f_w" type="number" min="1" max="12"></label>
+      <label><span>h</span><input id="f_h" type="number" min="1" max="12"></label>
+    </div>
+    <label><span>colour</span><input id="f_color" type="color"></label>
+    <label><span>action</span>
+      <select id="f_type">
+        <option value="shell">shell command</option>
+        <option value="open">open app / URL / file</option>
+        <option value="applescript">AppleScript</option>
+        <option value="page">switch page</option>
+      </select>
+    </label>
+    <label id="l_cmd"><span id="cmdName">command</span><input id="f_cmd"></label>
+    <label id="l_pagetarget" style="display:none"><span>go to page</span><select id="f_pagetarget"></select></label>
+    <fieldset>
+      <legend><label style="gap:6px"><input id="f_hasstatus" type="checkbox" style="flex:0"> live status colour</label></legend>
+      <div id="statusFields" style="display:none; flex-direction:column; gap:8px">
+        <label><span>check cmd</span><input id="f_scmd" placeholder="exit 0 = on"></label>
+        <div class="row">
+          <label><span>interval s</span><input id="f_sint" type="number" min="1" value="3"></label>
+          <label><span>on</span><input id="f_son" type="color"></label>
+          <label><span>off</span><input id="f_soff" type="color"></label>
+        </div>
+      </div>
+    </fieldset>
+    <div class="row">
+      <button id="delBtn" class="danger">delete button</button>
+    </div>
+  </form>
+</main>
+<script>
+let cfg = null, page = null, sel = -1;
+const $ = (id) => document.getElementById(id);
+const grid = $("grid"), form = $("form"), msg = $("msg");
+const cells = [];
+for (let i = 0; i < 144; i++) {
+  const c = document.createElement("button");
+  c.className = "cell";
+  c.addEventListener("click", () => cellClick(i % 12, Math.floor(i / 12)));
+  grid.appendChild(c); cells.push(c);
+}
+const rgbHex = (a) => "#" + a.map((v) => v.toString(16).padStart(2, "0")).join("");
+const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const buttons = () => cfg.pages[page].buttons;
+
+function render() {
+  const sels = $("pageSel");
+  sels.innerHTML = "";
+  for (const name of Object.keys(cfg.pages)) {
+    const o = document.createElement("option");
+    o.value = o.textContent = name;
+    if (name === page) o.selected = true;
+    sels.appendChild(o);
+  }
+  cells.forEach((c) => { c.style.background = "#0a0b0f"; c.classList.remove("sel"); });
+  buttons().forEach((b, bi) => {
+    for (let yy = b.y; yy < Math.min(b.y + (b.h || 3), 12); yy++)
+      for (let xx = b.x; xx < Math.min(b.x + (b.w || 3), 12); xx++) {
+        const c = cells[yy * 12 + xx];
+        c.style.background = rgbHex(b.color || [120, 120, 120]);
+        if (bi === sel) c.classList.add("sel");
+      }
+  });
+  form.classList.toggle("hidden", sel < 0);
+  if (sel >= 0) fillForm(buttons()[sel]);
+}
+
+function fillForm(b) {
+  $("f_label").value = b.label || "";
+  $("f_x").value = b.x; $("f_y").value = b.y;
+  $("f_w").value = b.w || 3; $("f_h").value = b.h || 3;
+  $("f_color").value = rgbHex(b.color || [120, 120, 120]);
+  const t = (b.action && b.action.type) || "shell";
+  $("f_type").value = t;
+  const pt = $("l_pagetarget"), lc = $("l_cmd");
+  pt.style.display = t === "page" ? "" : "none";
+  lc.style.display = t === "page" ? "none" : "";
+  $("cmdName").textContent = { shell: "command", open: "target", applescript: "script" }[t] || "command";
+  $("f_cmd").value = (b.action && (b.action.command || b.action.target || b.action.script)) || "";
+  const ptSel = $("f_pagetarget");
+  ptSel.innerHTML = "";
+  for (const name of Object.keys(cfg.pages)) {
+    const o = document.createElement("option");
+    o.value = o.textContent = name;
+    if (b.action && b.action.target === name) o.selected = true;
+    ptSel.appendChild(o);
+  }
+  $("f_hasstatus").checked = !!b.status;
+  $("statusFields").style.display = b.status ? "flex" : "none";
+  if (b.status) {
+    $("f_scmd").value = b.status.command || "";
+    $("f_sint").value = b.status.interval || 3;
+    $("f_son").value = rgbHex(b.status.on_color || [0, 200, 0]);
+    $("f_soff").value = rgbHex(b.status.off_color || [120, 120, 120]);
+  }
+}
+
+function applyForm() {
+  if (sel < 0) return;
+  const b = buttons()[sel];
+  b.label = $("f_label").value;
+  b.x = +$("f_x").value; b.y = +$("f_y").value;
+  b.w = +$("f_w").value; b.h = +$("f_h").value;
+  b.color = hexRgb($("f_color").value);
+  const t = $("f_type").value;
+  if (t === "page") b.action = { type: "page", target: $("f_pagetarget").value };
+  else if (t === "open") b.action = { type: "open", target: $("f_cmd").value };
+  else if (t === "applescript") b.action = { type: "applescript", script: $("f_cmd").value };
+  else b.action = { type: "shell", command: $("f_cmd").value };
+  if ($("f_hasstatus").checked) {
+    b.status = {
+      command: $("f_scmd").value, interval: +$("f_sint").value || 3,
+      on_color: hexRgb($("f_son").value), off_color: hexRgb($("f_soff").value),
+    };
+  } else delete b.status;
+  render();
+}
+
+function cellClick(x, y) {
+  const hit = buttons().findIndex((b) =>
+    b.x <= x && x < b.x + (b.w || 3) && b.y <= y && y < b.y + (b.h || 3));
+  if (hit >= 0) sel = hit;
+  else {
+    buttons().push({ x: Math.min(x, 9), y: Math.min(y, 9), w: 3, h: 3, label: "new button",
+      color: [120, 120, 120], action: { type: "shell", command: "" } });
+    sel = buttons().length - 1;
+  }
+  render();
+}
+
+form.addEventListener("input", applyForm);
+$("delBtn").addEventListener("click", () => { if (sel >= 0) { buttons().splice(sel, 1); sel = -1; render(); } });
+$("pageSel").addEventListener("change", (e) => { page = e.target.value; sel = -1; render(); });
+$("addPage").addEventListener("click", () => {
+  const name = prompt("new page name:");
+  if (!name || cfg.pages[name]) return;
+  cfg.pages[name] = { buttons: [] };
+  page = name; sel = -1; render();
+});
+$("delPage").addEventListener("click", () => {
+  const names = Object.keys(cfg.pages);
+  if (names.length <= 1) { msg.textContent = "can't delete the last page"; return; }
+  if (!confirm(`delete page '${page}'?`)) return;
+  delete cfg.pages[page];
+  if (cfg.start_page === page) cfg.start_page = Object.keys(cfg.pages)[0];
+  page = Object.keys(cfg.pages)[0]; sel = -1; render();
+});
+$("save").addEventListener("click", async () => {
+  const res = await fetch("/config", { method: "POST", body: JSON.stringify(cfg) });
+  msg.textContent = res.ok ? "saved — board updates in ~1s" : "error: " + (await res.text());
+});
+
+(async () => {
+  cfg = await (await fetch("/config")).json();
+  page = cfg.start_page || Object.keys(cfg.pages)[0];
+  render();
+})();
+</script>
+</body>
+</html>

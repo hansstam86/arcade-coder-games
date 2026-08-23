@@ -96,14 +96,40 @@ class Deck(Game):
     config_path = CONFIG_PATH
 
     def start(self):
-        cfg = json.loads(Path(self.config_path).read_text())
+        self._load(initial=True)
+        self.flashes: dict[int, tuple[tuple, float]] = {}  # id(btn) -> (color, until)
+        self._next_mtime_check = 0.0
+        try:  # local web editor for the config (see deck_web.py)
+            from deck_web import ensure_server
+
+            ensure_server()
+        except Exception as exc:  # noqa: BLE001
+            log(f"config editor not started: {exc!r}")
+        log(f"deck up — page '{self.page}', {sum(len(b) for b in self.pages.values())} buttons")
+
+    def _load(self, initial: bool = False) -> None:
+        path = Path(self.config_path)
+        cfg = json.loads(path.read_text())
         self.pages = {
             name: [Button(b) for b in page.get("buttons", [])]
             for name, page in cfg["pages"].items()
         }
-        self.page = cfg.get("start_page", next(iter(self.pages)))
-        self.flashes: dict[int, tuple[tuple, float]] = {}  # id(btn) -> (color, until)
-        log(f"deck up — page '{self.page}', {sum(len(b) for b in self.pages.values())} buttons")
+        keep = None if initial else getattr(self, "page", None)
+        self.page = keep if keep in self.pages else cfg.get("start_page", next(iter(self.pages)))
+        self._cfg_mtime = path.stat().st_mtime
+
+    def _maybe_reload(self, now: float) -> None:
+        if now < self._next_mtime_check:
+            return
+        self._next_mtime_check = now + 1.0
+        try:
+            if Path(self.config_path).stat().st_mtime != self._cfg_mtime:
+                self._load()
+                self.flashes.clear()
+                log(f"deck.json changed — reloaded (page '{self.page}')")
+        except (OSError, json.JSONDecodeError, KeyError, StopIteration) as exc:
+            log(f"config reload failed, keeping old config: {exc!r}")
+            self._cfg_mtime = Path(self.config_path).stat().st_mtime
 
     def buttons(self):
         return self.pages[self.page]
@@ -137,6 +163,7 @@ class Deck(Game):
 
     def update(self, dt):
         now = time.monotonic()
+        self._maybe_reload(now)
         for btn in self.buttons():
             # harvest finished actions -> success/failure flash
             if btn.action_proc is not None and btn.action_proc.poll() is not None:
