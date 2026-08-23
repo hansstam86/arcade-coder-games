@@ -807,6 +807,7 @@ async def run(board: Board) -> None:
     app: App | None = None
     last_cls: type | None = None
     last_frame = b""
+    last_send = 0.0
     while not board.notify_queue.empty():
         board.notify_queue.get_nowait()
     log("menu up — 10 games: mines moles simon lights four sudoku pairs tetris duel snake")
@@ -825,9 +826,12 @@ async def run(board: Board) -> None:
                 log("choice: green = play again, blue = menu")
         else:
             frame = choice_frame(now)
-        if frame != last_frame:
+        # throttle writes: sustained fast frame streams (tetris/snake/duel)
+        # overload the ESP32 BLE stack and drop the connection
+        if frame != last_frame and now - last_send >= 0.2:
             await board.send_frame(frame)
             last_frame = frame
+            last_send = now
 
         try:
             data = await asyncio.wait_for(board.notify_queue.get(), timeout=0.12)

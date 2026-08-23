@@ -79,6 +79,39 @@ That's a complete game loop: frames out, presses in, ~10 fps effective.
   produced zero notifications. Tilt/shake only reach games running on-board
   (`Engine.WhenTilted("LEFT"|"RIGHT"|"FORWARD"|"BACK")`, `Engine.WhenShaken`).
 
+## Write your own game (SDK + emulator)
+
+The `arcadecoder/` package lets anyone build games with no hardware and no
+protocol knowledge — and run the same file on a real board:
+
+```python
+from arcadecoder import Game, run
+
+class Chase(Game):
+    fps = 10
+    def start(self):            self.target = (5, 5)
+    def on_press(self, x, y):
+        if (x, y) == self.target: ...
+    def update(self, dt):       ...
+    def draw(self, screen):     screen.set(*self.target, (0, 220, 0))
+
+run(Chase)
+```
+
+- `python examples/chase.py` — opens the **browser emulator** at
+  http://127.0.0.1:7777: a virtual Arcade Coder with clickable pads and live
+  frames (stdlib only, no dependencies).
+- `python examples/chase.py --hw` — the same game on the real board over BLE.
+  On macOS run it through the permission-holding app bundle:
+  `echo examples/chase.py > launch_target.txt && open ArcadeMinesweeper.app`.
+
+API: `Screen.set/get/rect/clear` with display-RGB colours and (0,0) top-left;
+`Game.start/on_press(x,y)/update(dt)/draw(screen)/end()`; `fps` picks the tick
+rate; games auto-restart after `end()`. The BLE backend handles the colour
+swap, Huffman-only compression, write pacing, press decoding, and reconnects.
+See [examples/chase.py](examples/chase.py) (minimal) and
+[examples/snake.py](examples/snake.py) (real-time).
+
 ## Setup (macOS)
 
 ```bash
@@ -110,8 +143,12 @@ Clear all 126 safe pads → green flash.
 
 ## Repo map
 
+- `arcadecoder/` — the SDK: game API, browser emulator, BLE backend,
+  protocol (canonical home of the protocol code)
+- `examples/` — SDK example games
 - `minesweeper.py` — BLE client + protocol encode/decode + minesweeper (the
-  `Board` class here is the reusable plumbing)
+  `Board` class here is the original plumbing)
+- `arcade.py` — the 10-game launcher that runs on the board
 - `whackamole.py` — whack-a-mole on the same plumbing
 - `snake_upload.py`, `run_snake.py` — WIP on-board snake (uploaded XS JS)
 - `builtin_probe.py` — automated dead-strip bisection over BLE
