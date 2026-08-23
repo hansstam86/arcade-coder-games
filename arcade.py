@@ -417,36 +417,367 @@ class Sudoku(App):
 
 
 # ---------------------------------------------------------------------------
+# Memory Pairs (4x4 cards of 2x2 pads, 8 colour pairs)
+# ---------------------------------------------------------------------------
+
+PAIR_COLS = [(220, 0, 0), (0, 200, 0), (0, 60, 230), (220, 200, 0),
+             (0, 190, 190), (200, 0, 180), (230, 230, 230), (240, 90, 0)]
+
+
+class Pairs(App):
+    name = "pairs"
+
+    def __init__(self) -> None:
+        deck = list(range(8)) * 2
+        random.shuffle(deck)
+        self.cards = deck                      # 16 cards, index 0..15
+        self.matched: set[int] = set()
+        self.up: list[int] = []                # currently flipped (0..2)
+        self.hide_t = 0.0                      # when to flip mismatches back
+        self.win_t = 0.0
+        self.moves = 0
+
+    @staticmethod
+    def card_at(idx: int) -> int | None:
+        x, y = idx % W, idx // W
+        if (x - 1) % 3 == 2 or (y - 1) % 3 == 2:   # gaps
+            return None
+        i, j = (x - 1) // 3, (y - 1) // 3
+        if 0 <= i < 4 and 0 <= j < 4 and x >= 1 and y >= 1:
+            return j * 4 + i
+        return None
+
+    def press(self, idx, now):
+        if self.win_t:
+            return
+        if self.hide_t:                        # mismatch showing: flip back now
+            self.up, self.hide_t = [], 0.0
+        card = self.card_at(idx)
+        if card is None or card in self.matched or card in self.up:
+            return
+        self.up.append(card)
+        if len(self.up) == 2:
+            self.moves += 1
+            a, b = self.up
+            if self.cards[a] == self.cards[b]:
+                self.matched |= {a, b}
+                self.up = []
+                if len(self.matched) == 16:
+                    log(f"pairs: solved in {self.moves} moves")
+                    self.win_t = now
+            else:
+                self.hide_t = now + 1.1
+
+    def frame(self, now):
+        if self.hide_t and now >= self.hide_t:
+            self.up, self.hide_t = [], 0.0
+        if self.win_t:
+            if now - self.win_t > 3.0:
+                self.over = True
+            if int((now - self.win_t) / 0.35) % 2:
+                return solid((0, 160, 0))
+        buf = [(0, 0, 0)] * N
+        for card in range(16):
+            i, j = card % 4, card // 4
+            if card in self.matched:
+                col = tuple(v // 4 for v in PAIR_COLS[self.cards[card]])
+            elif card in self.up:
+                col = PAIR_COLS[self.cards[card]]
+            else:
+                col = (14, 14, 14)
+            block(buf, 1 + 3 * i, 1 + 3 * j, 2, 2, col)
+        return to_bytes(buf)
+
+
+# ---------------------------------------------------------------------------
+# Tetris (12x12; press left/right thirds to move, middle to rotate)
+# ---------------------------------------------------------------------------
+
+TET = {
+    "I": ([(-1, 0), (0, 0), (1, 0), (2, 0)], (0, 190, 190)),
+    "O": ([(0, 0), (1, 0), (0, 1), (1, 1)], (220, 200, 0)),
+    "T": ([(-1, 0), (0, 0), (1, 0), (0, 1)], (160, 0, 220)),
+    "S": ([(0, 0), (1, 0), (-1, 1), (0, 1)], (0, 200, 0)),
+    "Z": ([(-1, 0), (0, 0), (0, 1), (1, 1)], (220, 0, 0)),
+    "J": ([(-1, 0), (0, 0), (1, 0), (1, 1)], (0, 60, 230)),
+    "L": ([(-1, 0), (0, 0), (1, 0), (-1, 1)], (240, 90, 0)),
+}
+
+
+class Tetris(App):
+    name = "tetris"
+
+    def __init__(self) -> None:
+        self.field: list[list[tuple | None]] = [[None] * W for _ in range(H)]
+        self.lines = 0
+        self.dead_t = 0.0
+        self.next_fall = time.monotonic() + self.fall_interval()
+        self.spawn()
+
+    def fall_interval(self) -> float:
+        return max(0.25, 0.8 - self.lines * 0.03)
+
+    def spawn(self) -> None:
+        self.kind = random.choice(list(TET))
+        self.cells, self.col = TET[self.kind]
+        self.cells = list(self.cells)
+        self.px, self.py = 5, 0
+        if self.collides(self.cells, self.px, self.py):
+            log(f"tetris: game over — {self.lines} lines")
+            self.dead_t = time.monotonic()
+
+    def collides(self, cells, px, py) -> bool:
+        for dx, dy in cells:
+            x, y = px + dx, py + dy
+            if not (0 <= x < W and 0 <= y < H) or self.field[y][x]:
+                return True
+        return False
+
+    def press(self, idx, now):
+        if self.dead_t:
+            return
+        x = idx % W
+        if x < 4:
+            if not self.collides(self.cells, self.px - 1, self.py):
+                self.px -= 1
+        elif x >= 8:
+            if not self.collides(self.cells, self.px + 1, self.py):
+                self.px += 1
+        elif self.kind != "O":
+            rot = [(-dy, dx) for dx, dy in self.cells]
+            for shift in (0, -1, 1, -2, 2):
+                if not self.collides(rot, self.px + shift, self.py):
+                    self.cells, self.px = rot, self.px + shift
+                    break
+
+    def lock(self) -> None:
+        for dx, dy in self.cells:
+            self.field[self.py + dy][self.px + dx] = self.col
+        full = [y for y in range(H) if all(self.field[y])]
+        for y in full:
+            del self.field[y]
+            self.field.insert(0, [None] * W)
+        self.lines += len(full)
+        if full:
+            log(f"tetris: {self.lines} lines")
+        self.spawn()
+
+    def frame(self, now):
+        if self.dead_t:
+            if now - self.dead_t > 3.5:
+                self.over = True
+            buf = [(0, 0, 0)] * N
+            for i in range(min(self.lines, N)):
+                buf[i] = (0, 160, 0)
+            return to_bytes(buf)
+        while now >= self.next_fall and not self.dead_t:
+            if self.collides(self.cells, self.px, self.py + 1):
+                self.lock()
+            else:
+                self.py += 1
+            self.next_fall += self.fall_interval()
+        buf = [(0, 0, 2)] * N
+        for y in range(H):
+            for x in range(W):
+                if self.field[y][x]:
+                    buf[y * W + x] = self.field[y][x]
+        if not self.dead_t:
+            for dx, dy in self.cells:
+                paint(buf, self.px + dx, self.py + dy, self.col)
+        return to_bytes(buf)
+
+
+# ---------------------------------------------------------------------------
+# Reaction Duel (2 players, top vs bottom half, first to 5)
+# ---------------------------------------------------------------------------
+
+
+class Duel(App):
+    name = "duel"
+
+    def __init__(self) -> None:
+        self.scores = [0, 0]           # [top, bottom]
+        self.state = "wait"            # wait | armed | over
+        self.t_target = time.monotonic() + random.uniform(1.2, 3.2)
+        self.targets = None            # ((x,y) top, (x,y) bottom)
+        self.flash = None              # (player, until)
+        self.end_t = 0.0
+
+    def new_round(self, now):
+        self.state = "wait"
+        self.t_target = now + random.uniform(1.2, 3.2)
+        self.targets = None
+
+    def score(self, player, now):
+        self.scores[player] += 1
+        self.flash = (player, now + 0.7)
+        if self.scores[player] >= 5:
+            log(f"duel: player {'top' if player == 0 else 'bottom'} wins {self.scores}")
+            self.state, self.end_t = "over", now
+        else:
+            self.new_round(now)
+
+    def press(self, idx, now):
+        if self.state == "over":
+            return
+        x, y = idx % W, idx // W
+        player = 0 if y < 6 else 1
+        if self.state == "wait":               # false start: other player scores
+            self.score(1 - player, now)
+            return
+        tx, ty = self.targets[player]
+        if tx <= x <= tx + 1 and ty <= y <= ty + 1:
+            self.score(player, now)
+
+    def frame(self, now):
+        if self.state == "wait" and now >= self.t_target:
+            x = random.randrange(0, W - 1)
+            ty = random.randrange(1, 4)
+            self.targets = ((x, ty), (W - 2 - x, 11 - ty - 1))
+            self.state = "armed"
+        if self.state == "over" and now - self.end_t > 3.5:
+            self.over = True
+        buf = [(0, 0, 0)] * N
+        for i in range(self.scores[0]):
+            paint(buf, 1 + i * 2, 0, (220, 0, 0))
+        for i in range(self.scores[1]):
+            paint(buf, 1 + i * 2, 11, (0, 60, 230))
+        if self.state == "armed" and self.targets:
+            for tx, ty in self.targets:
+                block(buf, tx, ty, 2, 2, (255, 255, 255))
+        if self.flash and now < self.flash[1]:
+            row = 0 if self.flash[0] == 0 else 11
+            for x in range(W):
+                buf[row * W + x] = (220, 0, 0) if self.flash[0] == 0 else (0, 60, 230)
+        if self.state == "over":
+            winner = 0 if self.scores[0] >= 5 else 1
+            col = (220, 0, 0) if winner == 0 else (0, 60, 230)
+            if int(now / 0.35) % 2:
+                block(buf, 0, 0 if winner == 0 else 6, 12, 6, col)
+        return to_bytes(buf)
+
+
+# ---------------------------------------------------------------------------
+# Snake (button-steered: press where you want it to go)
+# ---------------------------------------------------------------------------
+
+
+class Snake(App):
+    name = "snake"
+
+    def __init__(self) -> None:
+        self.body = [(5, 5), (4, 5), (3, 5)]   # head first
+        self.d = (1, 0)
+        self.pending = None
+        self.food = (9, 5)
+        self.eaten = 0
+        self.grow = 0
+        self.step = 0.30
+        self.next_step = time.monotonic() + self.step
+        self.dead_t = 0.0
+
+    def place_food(self):
+        while True:
+            p = (random.randrange(W), random.randrange(H))
+            if p not in self.body:
+                self.food = p
+                return
+
+    def press(self, idx, now):
+        if self.dead_t:
+            return
+        x, y = idx % W, idx // W
+        hx, hy = self.body[0]
+        dx, dy = x - hx, y - hy
+        if dx == dy == 0:
+            return
+        nd = (1 if dx > 0 else -1, 0) if abs(dx) >= abs(dy) else (0, 1 if dy > 0 else -1)
+        if (nd[0] + self.d[0], nd[1] + self.d[1]) != (0, 0):   # no reversing
+            self.pending = nd
+
+    def frame(self, now):
+        if self.dead_t:
+            if now - self.dead_t > 3.5:
+                self.over = True
+            buf = [(0, 0, 0)] * N
+            for i in range(min(self.eaten, N)):
+                buf[i] = (0, 160, 0)
+            return to_bytes(buf)
+        while now >= self.next_step and not self.dead_t:
+            if self.pending:
+                self.d, self.pending = self.pending, None
+            hx, hy = self.body[0]
+            nh = ((hx + self.d[0]) % W, (hy + self.d[1]) % H)
+            if nh in self.body:
+                log(f"snake: dead at {self.eaten} food")
+                self.dead_t = now
+                break
+            self.body.insert(0, nh)
+            if nh == self.food:
+                self.eaten += 1
+                self.grow += 2
+                self.step = max(0.15, self.step * 0.96)
+                self.place_food()
+            if self.grow:
+                self.grow -= 1
+            else:
+                self.body.pop()
+            self.next_step += self.step
+        buf = [(0, 0, 0)] * N
+        for i, (x, y) in enumerate(self.body):
+            buf[y * W + x] = (60, 255, 60) if i == 0 else (0, 170, 0)
+        fx, fy = self.food
+        buf[fy * W + fx] = (255, 0, 0)
+        return to_bytes(buf)
+
+
+# ---------------------------------------------------------------------------
 # Menu + end-choice screens
 # ---------------------------------------------------------------------------
 
 GAMES = [
     ("mines", Mines, (200, 200, 200), (1, 1)),
-    ("moles", Moles, (230, 170, 0), (5, 1)),
-    ("simon", Simon, (200, 0, 180), (9, 1)),
-    ("lights", Lights, (220, 140, 0), (1, 7)),
-    ("four", Four, (0, 180, 180), (5, 7)),
-    ("sudoku", Sudoku, (255, 60, 120), (9, 7)),
+    ("moles", Moles, (230, 170, 0), (4, 1)),
+    ("simon", Simon, None, (7, 1)),
+    ("lights", Lights, (220, 140, 0), (10, 1)),
+    ("four", Four, (0, 190, 190), (1, 5)),
+    ("sudoku", Sudoku, None, (4, 5)),
+    ("pairs", Pairs, None, (7, 5)),
+    ("tetris", Tetris, (160, 0, 220), (10, 5)),
+    ("duel", Duel, None, (1, 9)),
+    ("snake", Snake, (0, 200, 0), (4, 9)),
 ]
+
+ICON_QUADS = {
+    "simon": [(0, 180, 0), (200, 0, 0), (200, 180, 0), (0, 60, 220)],
+    "sudoku": [(200, 0, 180), (240, 90, 0), (255, 60, 120), (0, 190, 190)],
+    "pairs": [(255, 60, 120), (14, 14, 14), (14, 14, 14), (255, 60, 120)],
+    "duel": [(220, 0, 0), (220, 0, 0), (0, 60, 230), (0, 60, 230)],
+}
 
 
 def menu_frame(now) -> bytes:
     buf = [(0, 0, 0)] * N
     for name, _cls, col, (x, y) in GAMES:
-        if name == "sudoku":  # mini 3x3 rainbow icon
-            for i in range(9):
-                paint(buf, x + i % 3, y + i // 3, SUD_COLS[i + 1])
+        if name in ICON_QUADS:
+            q = ICON_QUADS[name]
+            paint(buf, x, y, q[0]); paint(buf, x + 1, y, q[1])
+            paint(buf, x, y + 1, q[2]); paint(buf, x + 1, y + 1, q[3])
         else:
-            block(buf, x, y, 3, 3, col)
+            block(buf, x, y, 2, 2, col)
     return to_bytes(buf)
 
 
 def menu_pick(idx) -> type | None:
     x, y = idx % W, idx // W
+    best, best_d = None, 99
     for _name, cls, _col, (bx, by) in GAMES:
-        if bx - 1 <= x <= bx + 3 and by - 1 <= y <= by + 3:
-            return cls
-    return None
+        dx = max(bx - x, 0, x - (bx + 1))
+        dy = max(by - y, 0, y - (by + 1))
+        d = max(dx, dy)
+        if d < best_d:
+            best, best_d = cls, d
+    return best if best_d <= 1 else None
 
 
 def choice_frame(now) -> bytes:
@@ -478,7 +809,7 @@ async def run(board: Board) -> None:
     last_frame = b""
     while not board.notify_queue.empty():
         board.notify_queue.get_nowait()
-    log("menu up — mines(white) moles(yellow) simon(magenta) lights(amber) four(cyan) sudoku(rainbow)")
+    log("menu up — 10 games: mines moles simon lights four sudoku pairs tetris duel snake")
 
     while True:
         now = time.monotonic()

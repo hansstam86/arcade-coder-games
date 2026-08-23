@@ -15,8 +15,13 @@ Working games — all launchable from an on-board menu ([arcade.py](arcade.py)):
 - **Connect Four** — 12×12, 1-pixel discs, two players at the board.
 - **Colour Sudoku** — 9×9, colours as digits, palette row to pick, guided
   mode (wrong colours flash red and don't stick).
+- **Memory Pairs** — 4×4 cards, 8 colour pairs, mismatches flip back.
+- **Tetris** — press left/right thirds to move, middle to rotate.
+- **Reaction Duel** — two players, top vs bottom half; hit your white target
+  first, false starts give the point away, first to 5.
+- **Snake** — press where you want it to go; wraps at edges, speeds up.
 
-The menu shows five icons; press one to play. After a game: green = replay,
+The menu shows ten icons; press one to play. After a game: green = replay,
 blue = back to the menu.
 
 Work in progress:
