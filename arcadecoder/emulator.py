@@ -22,6 +22,7 @@ PORT = 7777
 HTML = (Path(__file__).parent / "emulator.html").read_text()
 
 _presses: "queue.Queue[tuple[int, int]]" = queue.Queue()
+_reset = threading.Event()
 _frame_lock = threading.Lock()
 _frame: list[str] = ["#000000"] * 144
 _frame_seq = 0
@@ -46,6 +47,10 @@ class Handler(BaseHTTPRequestHandler):
                 _presses.put((int(q["x"][0]), int(q["y"][0])))
             except (KeyError, ValueError):
                 pass
+            self.send_response(204)
+            self.end_headers()
+        elif url.path == "/reset":
+            _reset.set()
             self.send_response(204)
             self.end_headers()
         elif url.path == "/events":
@@ -84,6 +89,9 @@ def run_emulator(game_cls: type[Game], port: int = PORT, open_browser: bool = Tr
     try:
         while True:
             t0 = time.monotonic()
+            if _reset.is_set():
+                _reset.clear()
+                loop.reset()
             while not _presses.empty():
                 x, y = _presses.get_nowait()
                 loop.press(x, y)

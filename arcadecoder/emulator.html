@@ -28,6 +28,13 @@
     margin: 22px auto 0; width: 46px; height: 12px; border-radius: 6px;
     background: #c9c4ba;
   }
+  .reset {
+    display: block; margin: 14px auto 0; padding: 6px 18px;
+    border: 1px solid #3a3f4c; border-radius: 8px; background: #1d2027;
+    color: #9aa3b2; font: 500 12px system-ui, sans-serif; cursor: pointer;
+  }
+  .reset:hover { background: #262b35; color: #d5dae4; }
+  .reset:active { transform: scale(.96); }
   h1 { font-size: 14px; font-weight: 500; text-align: center; margin: 18px 0 0; }
   .hint { font-size: 12px; text-align: center; margin-top: 6px; opacity: .7; }
 </style>
@@ -39,7 +46,8 @@
     <div class="home"></div>
   </div>
   <h1>Arcade Coder Emulator</h1>
-  <div class="hint">click pads to press them</div>
+  <div class="hint">click pads to press them &middot; R = reset</div>
+  <button class="reset" id="reset" title="restart the game (like power-cycling the board)">&#x27F2; reset</button>
 </div>
 <script>
   const grid = document.getElementById("grid");
@@ -50,6 +58,11 @@
     b.addEventListener("click", () => fetch(`/press?x=${x}&y=${y}`));
     grid.appendChild(b); pads.push(b);
   }
+  const reset = () => fetch("/reset");
+  document.getElementById("reset").addEventListener("click", reset);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "r" || e.key === "R") reset();
+  });
   const es = new EventSource("/events");
   es.onmessage = (e) => {
     const px = JSON.parse(e.data);

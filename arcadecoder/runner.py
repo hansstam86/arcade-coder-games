@@ -25,6 +25,11 @@ class GameLoop:
         if not self.game.finished:
             self.game.on_press(x, y)
 
+    def reset(self) -> None:
+        """Restart the game from scratch (the emulator's reboot button)."""
+        self.screen.clear()
+        self._restart()
+
     def tick(self) -> list[str]:
         """Advance the game; returns the current frame as hex colours."""
         now = time.monotonic()
