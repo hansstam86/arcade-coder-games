@@ -4,12 +4,18 @@ Playable games for the [Tech Will Save Us Arcade Coder](https://github.com/padra
 (the 12×12 RGB LED button matrix), driven from a Mac over Bluetooth LE against
 the **unmodified stock firmware**. No disassembly, no reflashing, no UART.
 
-Working games:
+Working games — all launchable from an on-board menu ([arcade.py](arcade.py)):
 
 - **Minesweeper** ([minesweeper.py](minesweeper.py)) — 12×12, 18 mines, colour-coded
-  neighbour counts, flood reveal, first-press-safe, auto-restart.
-- **Whack-a-Mole** ([whackamole.py](whackamole.py)) — 2×2 yellow moles, 45-second
+  neighbour counts, flood reveal, first-press-safe.
+- **Whack-a-Mole** ([whackamole.py](whackamole.py)) — 1-pixel moles, 45-second
   rounds with a timer bar, ramping difficulty, score screen.
+- **Simon** — 4-quadrant memory sequence.
+- **Lights Out** — 5×5 puzzle, always-solvable scramble.
+- **Connect Four** — 12×12, 1-pixel discs, two players at the board.
+
+The menu shows five icons; press one to play. After a game: green = replay,
+blue = back to the menu.
 
 Work in progress:
 
@@ -74,7 +80,7 @@ cd arcade-coder-games
 uv venv --python 3.11 .venv        # or python3.11 -m venv .venv
 uv pip install --python .venv/bin/python 'bleak==0.22.3'
 codesign --force --deep -s - ArcadeMinesweeper.app   # re-sign for your machine
-echo minesweeper.py > launch_target.txt
+echo arcade.py > launch_target.txt
 open ArcadeMinesweeper.app
 ```
 
