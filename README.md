@@ -13,6 +13,8 @@ Working games — all launchable from an on-board menu ([arcade.py](arcade.py)):
 - **Simon** — 4-quadrant memory sequence.
 - **Lights Out** — 5×5 puzzle, always-solvable scramble.
 - **Connect Four** — 12×12, 1-pixel discs, two players at the board.
+- **Colour Sudoku** — 9×9, colours as digits, palette row to pick, guided
+  mode (wrong colours flash red and don't stick).
 
 The menu shows five icons; press one to play. After a game: green = replay,
 blue = back to the menu.

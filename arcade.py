@@ -309,6 +309,114 @@ class Four(App):
 
 
 # ---------------------------------------------------------------------------
+# Colour Sudoku (9x9 grid + palette row; guided: wrong colours flash red)
+# ---------------------------------------------------------------------------
+
+SUD_COLS = {
+    1: (220, 0, 0),      # red
+    2: (0, 200, 0),      # green
+    3: (0, 60, 230),     # blue
+    4: (220, 200, 0),    # yellow
+    5: (200, 0, 180),    # magenta
+    6: (0, 190, 190),    # cyan
+    7: (240, 90, 0),     # orange
+    8: (230, 230, 230),  # white
+    9: (255, 60, 120),   # pink
+}
+GIVENS = 38
+
+
+def gen_sudoku() -> list[list[int]]:
+    grid = [[0] * 9 for _ in range(9)]
+
+    def ok(r, c, v):
+        if any(grid[r][x] == v for x in range(9)):
+            return False
+        if any(grid[y][c] == v for y in range(9)):
+            return False
+        br, bc = r // 3 * 3, c // 3 * 3
+        return all(grid[br + y][bc + x] != v for y in range(3) for x in range(3))
+
+    def fill(pos=0):
+        if pos == 81:
+            return True
+        r, c = divmod(pos, 9)
+        vals = list(range(1, 10))
+        random.shuffle(vals)
+        for v in vals:
+            if ok(r, c, v):
+                grid[r][c] = v
+                if fill(pos + 1):
+                    return True
+                grid[r][c] = 0
+        return False
+
+    fill()
+    return grid
+
+
+class Sudoku(App):
+    name = "sudoku"
+
+    def __init__(self) -> None:
+        self.sol = gen_sudoku()
+        cells = [(r, c) for r in range(9) for c in range(9)]
+        self.given = set(random.sample(cells, GIVENS))
+        self.placed: set[tuple[int, int]] = set()
+        self.sel = 1
+        self.wrong: dict[tuple[int, int], float] = {}
+        self.win_t = 0.0
+
+    def press(self, idx, now):
+        if self.win_t:
+            return
+        x, y = idx % W, idx // W
+        if y == 11 and x < 9:
+            self.sel = x + 1
+            return
+        if x < 9 and y < 9:
+            cell = (y, x)
+            if cell in self.given or cell in self.placed:
+                return
+            if self.sol[y][x] == self.sel:
+                self.placed.add(cell)
+                if len(self.placed) + len(self.given) == 81:
+                    log("sudoku: solved!")
+                    self.win_t = now
+            else:
+                self.wrong[cell] = now + 0.6
+
+    def frame(self, now):
+        if self.win_t and now - self.win_t > 0.3:
+            if now - self.win_t > 3.0:
+                self.over = True
+            if int((now - self.win_t) / 0.35) % 2:
+                return solid((0, 170, 0))
+        blink = int(now / 0.3) % 2
+        buf = [(0, 0, 0)] * N
+        self.wrong = {c: t for c, t in self.wrong.items() if t > now}
+        for r in range(9):
+            for c in range(9):
+                box_dark = ((r // 3) + (c // 3)) % 2 == 0
+                if (r, c) in self.wrong:
+                    col = (200, 0, 0)
+                elif (r, c) in self.given:
+                    col = SUD_COLS[self.sol[r][c]]
+                elif (r, c) in self.placed:
+                    col = tuple(v * 11 // 20 for v in SUD_COLS[self.sol[r][c]])
+                else:
+                    col = (0, 0, 0) if box_dark else (5, 5, 9)
+                paint(buf, c, r, col)
+        for v in range(1, 10):  # palette
+            col = SUD_COLS[v]
+            if v == self.sel and blink:
+                col = tuple(min(255, c + 60) for c in col)
+            paint(buf, v - 1, 11, col)
+        block(buf, 10, 10, 2, 2, SUD_COLS[self.sel])  # selected swatch
+        return to_bytes(buf)
+
+
+# ---------------------------------------------------------------------------
 # Menu + end-choice screens
 # ---------------------------------------------------------------------------
 
@@ -316,15 +424,20 @@ GAMES = [
     ("mines", Mines, (200, 200, 200), (1, 1)),
     ("moles", Moles, (230, 170, 0), (5, 1)),
     ("simon", Simon, (200, 0, 180), (9, 1)),
-    ("lights", Lights, (220, 140, 0), (3, 7)),
-    ("four", Four, (0, 180, 180), (7, 7)),
+    ("lights", Lights, (220, 140, 0), (1, 7)),
+    ("four", Four, (0, 180, 180), (5, 7)),
+    ("sudoku", Sudoku, (255, 60, 120), (9, 7)),
 ]
 
 
 def menu_frame(now) -> bytes:
     buf = [(0, 0, 0)] * N
-    for _name, _cls, col, (x, y) in GAMES:
-        block(buf, x, y, 3, 3, col)
+    for name, _cls, col, (x, y) in GAMES:
+        if name == "sudoku":  # mini 3x3 rainbow icon
+            for i in range(9):
+                paint(buf, x + i % 3, y + i // 3, SUD_COLS[i + 1])
+        else:
+            block(buf, x, y, 3, 3, col)
     return to_bytes(buf)
 
 
@@ -365,7 +478,7 @@ async def run(board: Board) -> None:
     last_frame = b""
     while not board.notify_queue.empty():
         board.notify_queue.get_nowait()
-    log("menu up — press an icon: mines(white) moles(yellow) simon(magenta) lights(amber) four(cyan)")
+    log("menu up — mines(white) moles(yellow) simon(magenta) lights(amber) four(cyan) sudoku(rainbow)")
 
     while True:
         now = time.monotonic()
