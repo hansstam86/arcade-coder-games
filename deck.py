@@ -85,7 +85,11 @@ def action_command(action: dict) -> list[str] | None:
     if kind == "shell":
         return ["/bin/sh", "-c", action["command"]]
     if kind == "open":
-        return ["open", action["target"]]
+        target = action["target"]
+        # "www.youtube.com" is a URL, not a file — give bare domains a scheme
+        if "://" not in target and not target.startswith(("/", "~")) and "." in target.split("/")[0] and not Path(target).exists():
+            target = "https://" + target
+        return ["open", target]
     if kind == "applescript":
         return ["osascript", "-e", action["script"]]
     return None
