@@ -1,0 +1,38 @@
+{
+  "bpm_start": 80,
+  "bpm_max": 140,
+  "lane_notes": [
+    36,
+    38,
+    42,
+    39
+  ],
+  "lane_colors": [
+    [
+      240,
+      90,
+      0
+    ],
+    [
+      220,
+      200,
+      0
+    ],
+    [
+      0,
+      190,
+      190
+    ],
+    [
+      200,
+      0,
+      60
+    ]
+  ],
+  "channel": 0,
+  "velocity": 110,
+  "offset": 0.2,
+  "perfect": 0.14,
+  "good": 0.3,
+  "fall_rows_per_sec": 6.0
+}

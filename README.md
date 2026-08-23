@@ -168,6 +168,19 @@ colour overrides, and a send-test-note button. Saves hot-reload live.
 echo kopads_hw.py > launch_target.txt && open ArcadeMinesweeper.app
 ```
 
+## Rhythm game
+
+[rhythm.py](rhythm.py): falling notes in four wide lanes — press the lane as
+the note lands on the hit line, and a good hit **fires that lane's EP-133
+pad**, so accurate play builds the beat out loud. Perfect/good judgment,
+combos (every 8 heals), health bar on top, endless procedural chart with
+rising tempo and density. `rhythm.json` sets lane pads, tempo range, and the
+input-latency `offset` (raise it if your hits feel late over BLE).
+
+```bash
+echo rhythm_hw.py > launch_target.txt && open ArcadeMinesweeper.app
+```
+
 ## Ambient mode
 
 [ambient.py](ambient.py): the board as a living desk object. Seven scenes —
