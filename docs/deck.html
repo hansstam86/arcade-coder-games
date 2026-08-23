@@ -46,6 +46,7 @@
 <header>
   <h1>ArcadeDeck Editor</h1>
   <select id="pageSel"></select>
+  <input id="newPageName" placeholder="new page name" style="width:120px; display:none">
   <button id="addPage">+ page</button>
   <button id="delPage" class="danger">delete page</button>
   <div class="spacer"></div>
@@ -200,18 +201,27 @@ form.addEventListener("input", applyForm);
 $("delBtn").addEventListener("click", () => { if (sel >= 0) { buttons().splice(sel, 1); sel = -1; render(); } });
 $("pageSel").addEventListener("change", (e) => { page = e.target.value; sel = -1; render(); });
 $("addPage").addEventListener("click", () => {
-  const name = prompt("new page name:");
-  if (!name || cfg.pages[name]) return;
+  const inp = $("newPageName");
+  if (inp.style.display === "none") { inp.style.display = ""; inp.focus(); return; }
+  const name = inp.value.trim();
+  if (!name || cfg.pages[name]) { msg.textContent = name ? "page exists" : "type a page name first"; return; }
   cfg.pages[name] = { buttons: [] };
+  inp.value = ""; inp.style.display = "none";
   page = name; sel = -1; render();
 });
+$("newPageName").addEventListener("keydown", (e) => { if (e.key === "Enter") $("addPage").click(); });
+let delArmed = 0;
 $("delPage").addEventListener("click", () => {
   const names = Object.keys(cfg.pages);
   if (names.length <= 1) { msg.textContent = "can't delete the last page"; return; }
-  if (!confirm(`delete page '${page}'?`)) return;
+  if (Date.now() - delArmed > 3000) {
+    delArmed = Date.now();
+    msg.textContent = `click again to delete page '${page}'`;
+    return;
+  }
   delete cfg.pages[page];
   if (cfg.start_page === page) cfg.start_page = Object.keys(cfg.pages)[0];
-  page = Object.keys(cfg.pages)[0]; sel = -1; render();
+  page = Object.keys(cfg.pages)[0]; sel = -1; delArmed = 0; msg.textContent = ""; render();
 });
 $("save").addEventListener("click", async () => {
   if (connected) {
@@ -235,7 +245,7 @@ $("save").addEventListener("click", async () => {
 function setMode() {
   $("save").textContent = connected ? "\u2713 Save to board" : "\u2B07 Download deck.json";
   if (!connected && !LOCAL) {
-    msg.textContent = "no local deck found \u2014 demo mode (run deck.py on your Mac, then reload)";
+    msg.textContent = "no local deck found \u2014 demo mode. Run the deck locally, allow local-network access if Chrome asks, then reload";
   }
 }
 
