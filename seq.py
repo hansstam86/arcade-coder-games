@@ -175,6 +175,10 @@ TICKER: Ticker | None = None
 class Sequencer(Game):
     fps = 15
 
+    @property
+    def busy(self):
+        return STATE.playing
+
     def start(self):
         global TICKER
         self.s = STATE

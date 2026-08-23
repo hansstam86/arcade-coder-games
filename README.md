@@ -126,6 +126,22 @@ no hardware at all:
 python examples/full_arcade.py
 ```
 
+## ArcadeOS — everything in one process
+
+[arcadeos.py](arcadeos.py) is the way to run the whole platform: a home
+screen of seven icons (games / deck / ko-pads / sequencer / visualizer /
+rhythm / ambient). **Triple-tap the top-left pad** from anywhere to get home.
+Idle for 10 minutes and it slips into ambient mode — one press returns you
+to the app you were in (apps that are busy, like a playing sequencer, are
+never interrupted). A dashboard at http://127.0.0.1:7770 (hosted:
+[/arcadeos.html](https://hansstam86.github.io/arcade-coder-games/arcadeos.html))
+shows what's running and switches apps remotely.
+
+```bash
+echo arcadeos_hw.py > launch_target.txt && open ArcadeMinesweeper.app
+scripts/install_login.sh    # optional: start ArcadeOS at login
+```
+
 ## ArcadeDeck — a customizable Stream Deck
 
 [deck.py](deck.py) turns the board into a 12×12 macro pad. Everything is

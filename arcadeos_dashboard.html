@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ArcadeOS</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: #14161c; color: #9aa3b2;
+         font-family: system-ui, sans-serif; display: grid; place-items: center; }
+  .wrap { max-width: 560px; width: 100%; padding: 32px 20px; }
+  h1 { font-size: 20px; color: #d5dae4; margin: 0 0 4px; }
+  #state { font-size: 13px; opacity: .8; margin-bottom: 22px; }
+  .apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .app {
+    padding: 18px 14px; border: 1px solid #2a2f3a; border-radius: 14px;
+    background: #1b1d24; color: #c6cdd9; font: 600 14px system-ui;
+    cursor: pointer; text-align: left; transition: transform .06s;
+  }
+  .app:hover { background: #232732; }
+  .app:active { transform: scale(.97); }
+  .app.current { border-color: #2c6e40; background: #17251c; color: #b7eec6; }
+  .app small { display: block; font-weight: 400; font-size: 11px; opacity: .65; margin-top: 4px; }
+  .links { margin-top: 26px; font-size: 13px; display: flex; gap: 16px; flex-wrap: wrap; }
+  .links a { color: #7a86ff; text-decoration: none; }
+  #msg { margin-top: 14px; font-size: 12px; opacity: .8; min-height: 16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ArcadeOS</h1>
+  <div id="state">connecting&hellip;</div>
+  <div class="apps" id="apps"></div>
+  <div id="msg"></div>
+  <div class="links">
+    <a href="https://hansstam86.github.io/arcade-coder-games/">studio</a>
+    <a id="deckLink" href="http://127.0.0.1:7788">deck editor</a>
+    <a id="koLink" href="http://127.0.0.1:7799">ko-pads editor</a>
+    <a href="https://github.com/hansstam86/arcade-coder-games">github</a>
+  </div>
+</div>
+<script>
+const LOCAL = location.origin.startsWith("http://127.0.0.1") || location.origin.startsWith("http://localhost");
+const API = LOCAL ? "" : "http://127.0.0.1:7770";
+const DESC = {
+  home: "the icon menu on the board",
+  games: "10-game arcade",
+  deck: "customizable stream deck",
+  kopads: "play the EP-133",
+  seq: "step sequencer",
+  midiviz: "MIDI light show",
+  rhythm: "falling-notes game",
+  ambient: "clock, fire, plasma…",
+};
+const appsEl = document.getElementById("apps");
+const stateEl = document.getElementById("state");
+const msg = document.getElementById("msg");
+let current = null;
+
+function renderApps(names) {
+  appsEl.innerHTML = "";
+  for (const name of names) {
+    const b = document.createElement("button");
+    b.className = "app" + (name === current ? " current" : "");
+    b.innerHTML = `${name}<small>${DESC[name] || ""}</small>`;
+    b.addEventListener("click", async () => {
+      try {
+        await fetch(API + "/switch", { method: "POST", body: JSON.stringify({ app: name }),
+          headers: { "Content-Type": "application/json" } });
+        msg.textContent = `switching to ${name}…`;
+      } catch (e) { msg.textContent = "lost connection to ArcadeOS"; }
+    });
+    appsEl.appendChild(b);
+  }
+}
+
+async function poll() {
+  try {
+    const s = await (await fetch(API + "/status")).json();
+    current = s.app;
+    const up = Math.floor(s.uptime_s / 60);
+    stateEl.textContent = `running: ${s.app}` +
+      (s.auto_ambient_from ? ` (auto-ambient, will return to ${s.auto_ambient_from})` : "") +
+      (s.busy ? " · busy" : "") + ` · up ${up}m`;
+    renderApps(s.apps);
+  } catch (e) {
+    stateEl.textContent = LOCAL
+      ? "ArcadeOS is not responding"
+      : "no local ArcadeOS found — run it on the Mac connected to your board, allow local-network access if Chrome asks, then reload";
+    appsEl.innerHTML = "";
+  }
+}
+poll();
+setInterval(poll, 3000);
+</script>
+</body>
+</html>

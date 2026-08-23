@@ -100,6 +100,10 @@ class Rhythm(Game):
         self.over_at = 0.0
         log(f"rhythm: new run — {self.bpm} bpm, hit the lane when the light lands!")
 
+    @property
+    def busy(self):
+        return not self.over_at
+
     # -- MIDI ---------------------------------------------------------------
     def _open_port(self, now: float) -> None:
         if self.port is not None or now < self.next_port_try:

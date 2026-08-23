@@ -56,6 +56,7 @@ class MidiViz(Game):
         self.ripples: list[Ripple] = []
         self.tint = [0.0, 0.0]      # CC12, CC13 as 0..1
         self.notes_seen = 0
+        self.last_note_t = 0.0
         self._open_port(time.monotonic())
 
     def _open_port(self, now: float) -> None:
@@ -79,6 +80,10 @@ class MidiViz(Game):
         except Exception as exc:  # noqa: BLE001
             log(f"could not open MIDI input {name!r}: {exc!r}")
 
+    @property
+    def busy(self):
+        return time.monotonic() - self.last_note_t < 120
+
     def on_press(self, x, y):
         # pressing the board makes light too — a splash where you touch
         self.ripples.append(Ripple(x, y, (0, 190, 190), 110, time.monotonic()))
@@ -94,6 +99,7 @@ class MidiViz(Game):
                     x, y, color = note_position(msg.note)
                     self.ripples.append(Ripple(x, y, color, msg.velocity, now))
                     self.notes_seen += 1
+                    self.last_note_t = now
                     if self.notes_seen % 25 == 1:
                         log(f"notes seen: {self.notes_seen}")
                 elif msg.type == "control_change" and msg.control in (12, 13):
