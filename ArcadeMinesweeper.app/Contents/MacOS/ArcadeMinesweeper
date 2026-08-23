@@ -1,0 +1,8 @@
+#!/bin/bash
+# Resolve the repo root from the bundle's own location so clones work anywhere.
+DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
+TARGET="minesweeper.py"
+if [ -f "$DIR/launch_target.txt" ]; then
+  TARGET="$(cat "$DIR/launch_target.txt")"
+fi
+exec "$DIR/.venv/bin/python" -u "$DIR/$TARGET" >> "$DIR/game.log" 2>&1

@@ -1,0 +1,5 @@
+.venv/
+__pycache__/
+game.log
+device_config.json
+launch_target.txt
