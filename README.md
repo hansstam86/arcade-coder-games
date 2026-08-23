@@ -154,6 +154,20 @@ and action in the form, manage pages, and Save — the running deck hot-reloads
 The example config: mute toggle (with live state), Music play/pause, volume
 up/down, screenshot-to-clipboard, display sleep, links, and an apps page.
 
+## KO-pads — play a Teenage Engineering EP-133
+
+[kopads.py](kopads.py) maps the grid to all 48 pads of an EP-133 K.O. II over
+USB MIDI: four 3-row bands = groups A–D (notes 36-47/48-59/60-71/72-83),
+columns = pads. Auto-finds the EP-133's MIDI port and reopens it on unplug.
+Configure everything in the visual editor at http://127.0.0.1:7799 (also
+hosted at [/kopads.html](https://hansstam86.github.io/arcade-coder-games/kopads.html)):
+band colours and base notes, channel/velocity/note length, per-pad note and
+colour overrides, and a send-test-note button. Saves hot-reload live.
+
+```bash
+echo kopads_hw.py > launch_target.txt && open ArcadeMinesweeper.app
+```
+
 ## Setup (macOS)
 
 ```bash

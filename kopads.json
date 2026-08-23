@@ -1,0 +1,50 @@
+{
+  "port_contains": [
+    "EP-133",
+    "EP133",
+    "K.O",
+    "KO II"
+  ],
+  "channel": 0,
+  "velocity": 100,
+  "note_seconds": 0.25,
+  "bands": [
+    {
+      "group": "A",
+      "base_note": 36,
+      "color": [
+        240,
+        90,
+        0
+      ]
+    },
+    {
+      "group": "B",
+      "base_note": 48,
+      "color": [
+        220,
+        200,
+        0
+      ]
+    },
+    {
+      "group": "C",
+      "base_note": 60,
+      "color": [
+        230,
+        230,
+        230
+      ]
+    },
+    {
+      "group": "D",
+      "base_note": 72,
+      "color": [
+        200,
+        0,
+        60
+      ]
+    }
+  ],
+  "overrides": []
+}

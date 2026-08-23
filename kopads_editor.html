@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KO-pads Editor</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: #14161c; color: #9aa3b2;
+         font-family: system-ui, sans-serif; display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+           background: #1b1d24; border-bottom: 1px solid #262a34; }
+  header h1 { font-size: 15px; font-weight: 600; color: #d5dae4; margin: 0 8px 0 0; }
+  .spacer { flex: 1; }
+  button, select, input {
+    padding: 6px 10px; border: 1px solid #3a3f4c; border-radius: 8px;
+    background: #1d2027; color: #c6cdd9; font: 500 13px system-ui;
+  }
+  button { cursor: pointer; }
+  button:hover { background: #262b35; }
+  #save { background: #1d4a2b; border-color: #2c6e40; color: #b7eec6; }
+  #msg { font-size: 12px; opacity: .8; }
+  main { flex: 1; display: flex; gap: 24px; padding: 24px; flex-wrap: wrap; }
+  .grid { display: grid; grid-template-columns: repeat(12, 30px); gap: 4px;
+          background: #1b1d24; padding: 12px; border-radius: 12px; align-self: flex-start; }
+  .cell { width: 30px; height: 30px; border: 0; border-radius: 6px; background: #0a0b0f; cursor: pointer; }
+  .cell.sel { outline: 2px solid #fff; outline-offset: 1px; }
+  .cell.bandgap { margin-top: 8px; }
+  .col { display: flex; flex-direction: column; gap: 14px; min-width: 340px; max-width: 460px; }
+  fieldset { border: 1px solid #262a34; border-radius: 10px; display: flex;
+             flex-direction: column; gap: 8px; }
+  legend { font-size: 12px; padding: 0 6px; }
+  label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  label span { width: 100px; opacity: .8; }
+  label input, label select { flex: 1; }
+  input[type=color] { padding: 2px; height: 30px; }
+  input[type=number] { width: 74px; flex: 0; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .hint { font-size: 12px; opacity: .65; }
+  .bandrow { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+  .bandrow b { width: 18px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>KO-pads Editor</h1>
+  <span class="hint">EP-133 K.O. II mapping for the Arcade Coder</span>
+  <div class="spacer"></div>
+  <span id="msg"></span>
+  <button id="save">&#10003; Save</button>
+</header>
+<main>
+  <div>
+    <div class="grid" id="grid"></div>
+    <p class="hint">Four bands = EP-133 groups A–D, columns = pads.<br>
+      Click a pad to override its note or colour.</p>
+  </div>
+  <div class="col">
+    <fieldset>
+      <legend>bands (groups)</legend>
+      <div id="bands"></div>
+    </fieldset>
+    <fieldset>
+      <legend>global</legend>
+      <div class="row">
+        <label><span>MIDI channel</span><input id="g_ch" type="number" min="1" max="16"></label>
+        <label><span>velocity</span><input id="g_vel" type="number" min="1" max="127"></label>
+      </div>
+      <div class="row">
+        <label><span>note length s</span><input id="g_len" type="number" step="0.05" min="0.05" max="5"></label>
+      </div>
+      <label><span>port match</span><input id="g_port" placeholder="EP-133, EP133"></label>
+    </fieldset>
+    <fieldset id="padBox" style="display:none">
+      <legend>selected pad</legend>
+      <div class="row"><span id="padInfo" style="font-size:13px"></span></div>
+      <label><span>note override</span><input id="p_note" type="number" min="0" max="127" placeholder="default"></label>
+      <label><span>colour override</span><input id="p_hascol" type="checkbox" style="flex:0">
+        <input id="p_col" type="color"></label>
+      <div class="row">
+        <button id="p_test">&#9654; send test note</button>
+        <button id="p_clear">clear overrides</button>
+      </div>
+    </fieldset>
+  </div>
+</main>
+<script>
+const LOCAL = location.origin.startsWith("http://127.0.0.1") || location.origin.startsWith("http://localhost");
+const API = LOCAL ? "" : "http://127.0.0.1:7799";
+let connected = false, cfg = null, sel = null;   // sel = {band, col}
+const $ = (id) => document.getElementById(id);
+const msg = $("msg");
+const rgbHex = (a) => "#" + a.map((v) => v.toString(16).padStart(2, "0")).join("");
+const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const PAD_NAMES = [".", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
+
+const grid = $("grid");
+const cells = [];
+for (let y = 0; y < 12; y++) for (let x = 0; x < 12; x++) {
+  const c = document.createElement("button");
+  c.className = "cell" + (y % 3 === 0 && y > 0 ? " bandgap" : "");
+  c.addEventListener("click", () => { sel = { band: Math.floor(y / 3), col: x }; render(); });
+  grid.appendChild(c); cells.push(c);
+}
+
+const findOv = (b, c) => (cfg.overrides || []).find((o) => o.band === b && o.col === c);
+
+function render() {
+  for (let y = 0; y < 12; y++) for (let x = 0; x < 12; x++) {
+    const band = Math.floor(y / 3);
+    const ov = findOv(band, x);
+    const base = (ov && ov.color) || cfg.bands[band].color;
+    const scale = x % 3 ? 0.45 : 0.75;
+    const c = cells[y * 12 + x];
+    c.style.background = rgbHex(base.map((v) => Math.round(v * scale)));
+    c.classList.toggle("sel", !!sel && sel.band === band && sel.col === x);
+  }
+  const bandsEl = $("bands");
+  bandsEl.innerHTML = "";
+  cfg.bands.forEach((b, i) => {
+    const row = document.createElement("div");
+    row.className = "bandrow";
+    row.innerHTML = `<b>${b.group}</b> base note
+      <input type="number" min="0" max="115" value="${b.base_note}" data-i="${i}" data-k="base_note" style="width:74px">
+      colour <input type="color" value="${rgbHex(b.color)}" data-i="${i}" data-k="color">`;
+    bandsEl.appendChild(row);
+  });
+  bandsEl.querySelectorAll("input").forEach((inp) => inp.addEventListener("input", (e) => {
+    const b = cfg.bands[+e.target.dataset.i];
+    if (e.target.dataset.k === "color") b.color = hexRgb(e.target.value);
+    else b.base_note = +e.target.value || 0;
+    render();
+  }));
+  $("g_ch").value = (cfg.channel ?? 0) + 1;
+  $("g_vel").value = cfg.velocity ?? 100;
+  $("g_len").value = cfg.note_seconds ?? 0.25;
+  $("g_port").value = (cfg.port_contains || []).join(", ");
+  const box = $("padBox");
+  box.style.display = sel ? "flex" : "none";
+  if (sel) {
+    const band = cfg.bands[sel.band];
+    const ov = findOv(sel.band, sel.col);
+    const defNote = band.base_note + sel.col;
+    $("padInfo").textContent =
+      `group ${band.group}, pad ${PAD_NAMES[sel.col]} — default note ${defNote}` +
+      (ov && ov.note != null ? `, override ${ov.note}` : "");
+    $("p_note").value = ov && ov.note != null ? ov.note : "";
+    $("p_hascol").checked = !!(ov && ov.color);
+    $("p_col").value = rgbHex((ov && ov.color) || band.color);
+  }
+}
+
+function upsertOv(patch) {
+  cfg.overrides = cfg.overrides || [];
+  let ov = findOv(sel.band, sel.col);
+  if (!ov) { ov = { band: sel.band, col: sel.col }; cfg.overrides.push(ov); }
+  Object.assign(ov, patch);
+  if (ov.note == null) delete ov.note;
+  if (!ov.color) delete ov.color;
+  if (ov.note == null && !ov.color) cfg.overrides = cfg.overrides.filter((o) => o !== ov);
+}
+
+$("p_note").addEventListener("input", () => {
+  const v = $("p_note").value;
+  upsertOv({ note: v === "" ? null : Math.max(0, Math.min(127, +v)) });
+  render();
+});
+$("p_hascol").addEventListener("input", () => {
+  upsertOv({ color: $("p_hascol").checked ? hexRgb($("p_col").value) : null });
+  render();
+});
+$("p_col").addEventListener("input", () => {
+  if ($("p_hascol").checked) { upsertOv({ color: hexRgb($("p_col").value) }); render(); }
+});
+$("p_clear").addEventListener("click", () => { upsertOv({ note: null, color: null }); render(); });
+$("p_test").addEventListener("click", async () => {
+  if (!sel) return;
+  const ov = findOv(sel.band, sel.col);
+  const note = ov && ov.note != null ? ov.note : cfg.bands[sel.band].base_note + sel.col;
+  if (!connected) { msg.textContent = "no local KO-pads running — can't test"; return; }
+  try {
+    await fetch(API + "/test", { method: "POST", body: JSON.stringify({ note }),
+      headers: { "Content-Type": "application/json" } });
+    msg.textContent = `sent note ${note}`;
+  } catch (e) { msg.textContent = "test failed — is KO-pads running?"; }
+});
+["g_ch", "g_vel", "g_len", "g_port"].forEach((id) => $(id).addEventListener("input", () => {
+  cfg.channel = Math.max(0, Math.min(15, (+$("g_ch").value || 1) - 1));
+  cfg.velocity = Math.max(1, Math.min(127, +$("g_vel").value || 100));
+  cfg.note_seconds = Math.max(0.05, +$("g_len").value || 0.25);
+  cfg.port_contains = $("g_port").value.split(",").map((s) => s.trim()).filter(Boolean);
+}));
+
+$("save").addEventListener("click", async () => {
+  if (connected) {
+    try {
+      const res = await fetch(API + "/config", { method: "POST", body: JSON.stringify(cfg),
+        headers: { "Content-Type": "application/json" } });
+      msg.textContent = res.ok ? "saved — board updates in ~1s" : "error: " + (await res.text());
+    } catch (e) { msg.textContent = "lost connection to KO-pads"; connected = false; setMode(); }
+  } else {
+    const blob = new Blob([JSON.stringify(cfg, null, 2) + "\n"], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "kopads.json";
+    a.click();
+    msg.textContent = "downloaded kopads.json — drop it next to kopads.py";
+  }
+});
+
+function setMode() {
+  $("save").textContent = connected ? "✓ Save" : "⬇ Download kopads.json";
+  if (!connected && !LOCAL) msg.textContent =
+    "no local KO-pads found — demo mode. Run it locally, allow local-network access if Chrome asks, then reload";
+}
+
+(async () => {
+  try {
+    cfg = await (await fetch(API + "/config")).json();
+    connected = true;
+  } catch (e) {
+    cfg = await (await fetch("kopads_sample.json")).json();
+    connected = false;
+  }
+  setMode();
+  render();
+})();
+</script>
+</body>
+</html>

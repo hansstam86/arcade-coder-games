@@ -50,15 +50,31 @@ class KOPads(Game):
     fps = 10
 
     def start(self):
-        cfg = dict(DEFAULT)
-        if CONFIG_PATH.exists():
-            cfg.update(json.loads(CONFIG_PATH.read_text()))
-        self.cfg = cfg
+        self._load()
         self.port = None
         self.next_port_try = 0.0
+        self.next_mtime_check = 0.0
         self.active: dict[int, float] = {}   # note -> off time
         self.flashes: dict[tuple[int, int], float] = {}  # (band, col) -> until
         self._open_port(time.monotonic())
+        try:
+            from kopads_web import ensure_server
+
+            ensure_server()
+        except Exception as exc:  # noqa: BLE001
+            log(f"config editor not started: {exc!r}")
+
+    def _load(self) -> None:
+        cfg = dict(DEFAULT)
+        if CONFIG_PATH.exists():
+            cfg.update(json.loads(CONFIG_PATH.read_text()))
+            self.cfg_mtime = CONFIG_PATH.stat().st_mtime
+        else:
+            self.cfg_mtime = 0.0
+        self.cfg = cfg
+        self.overrides = {
+            (o["band"], o["col"]): o for o in cfg.get("overrides", [])
+        }
 
     # -- MIDI plumbing -------------------------------------------------------
     def _open_port(self, now: float) -> None:
@@ -103,7 +119,8 @@ class KOPads(Game):
     def on_press(self, x, y):
         band = min(y // 3, 3)
         spec = self.cfg["bands"][band]
-        note = spec["base_note"] + x
+        override = self.overrides.get((band, x), {})
+        note = override.get("note", spec["base_note"] + x)
         pad_names = [".", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
         log(f"group {spec['group']} pad {pad_names[x] if x < 12 else x} -> note {note}"
             + ("" if self.port else "  (no MIDI device yet)"))
@@ -115,6 +132,25 @@ class KOPads(Game):
         now = time.monotonic()
         if self.port is None:
             self._open_port(now)
+        if now >= self.next_mtime_check:
+            self.next_mtime_check = now + 1.0
+            try:
+                if CONFIG_PATH.exists() and CONFIG_PATH.stat().st_mtime != self.cfg_mtime:
+                    self._load()
+                    log("kopads.json changed — reloaded")
+            except (OSError, json.JSONDecodeError, KeyError) as exc:
+                log(f"config reload failed: {exc!r}")
+                self.cfg_mtime = CONFIG_PATH.stat().st_mtime
+        try:
+            from kopads_web import test_notes
+
+            while not test_notes.empty():
+                note = test_notes.get_nowait()
+                log(f"test note {note}")
+                self._send("note_on", note)
+                self.active[note] = now + float(self.cfg["note_seconds"])
+        except Exception:
+            pass
         for note, off_at in list(self.active.items()):
             if now >= off_at:
                 self._send("note_off", note)
@@ -128,7 +164,9 @@ class KOPads(Game):
             for col in range(12):
                 # dim base colour; brighter guide columns every 3 pads
                 scale = 32 if col % 3 else 55
-                color = tuple(v * scale // 100 for v in base)
+                override = self.overrides.get((band, col))
+                src_color = (override or {}).get("color", base)
+                color = tuple(v * scale // 100 for v in src_color)
                 if (band, col) in self.flashes:
                     color = (255, 255, 255)
                 for row in range(3):

@@ -17,5 +17,7 @@ sed '/^import sys$/d; /^from pathlib import Path$/d; /^sys\.path\.insert/d' \
 
 cp deck_editor.html docs/deck.html
 cp deck.json docs/deck_sample.json
+cp kopads_editor.html docs/kopads.html
+cp kopads.json docs/kopads_sample.json
 
 echo "synced $(ls docs/py docs/py/arcadecoder docs/py/examples | wc -l | tr -d ' ') files into docs/py"
