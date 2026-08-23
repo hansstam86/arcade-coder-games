@@ -63,6 +63,8 @@ class Button:
         self.w, self.h = int(spec.get("w", 3)), int(spec.get("h", 3))
         self.label = spec.get("label", "?")
         self.color = tuple(spec.get("color", [120, 120, 120]))
+        # optional pixel art: rows of [r,g,b], h rows of w entries
+        self.pixels = spec.get("pixels")
         self.action = spec.get("action", {})
         self.status = spec.get("status")
         self.status_state: bool | None = None
@@ -199,10 +201,26 @@ class Deck(Game):
         screen.clear((3, 3, 5))
         for btn in self.buttons():
             flash = self.flashes.get(id(btn))
-            color = flash[0] if flash else btn.current_color()
-            for yy in range(btn.y, min(btn.y + btn.h, 12)):
-                for xx in range(btn.x, min(btn.x + btn.w, 12)):
-                    screen.set(xx, yy, color)
+            # precedence: press/result flash > live status colour > pixel art > base colour
+            solid = None
+            if flash:
+                solid = flash[0]
+            elif btn.status and btn.status_state is not None:
+                solid = btn.current_color()
+            elif not btn.pixels:
+                solid = btn.color
+            for dy in range(btn.h):
+                for dx in range(btn.w):
+                    xx, yy = btn.x + dx, btn.y + dy
+                    if xx >= 12 or yy >= 12:
+                        continue
+                    if solid is not None:
+                        screen.set(xx, yy, solid)
+                    else:
+                        try:
+                            screen.set(xx, yy, tuple(btn.pixels[dy][dx]))
+                        except (IndexError, TypeError):
+                            screen.set(xx, yy, btn.color)
 
 
 if __name__ == "__main__":

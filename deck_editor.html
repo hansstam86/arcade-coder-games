@@ -27,6 +27,8 @@
   .cell { width: 32px; height: 32px; border: 0; border-radius: 6px; background: #0a0b0f;
           cursor: pointer; }
   .cell.sel { outline: 2px solid #fff; outline-offset: 1px; }
+  .pix { width: 22px; height: 22px; border: 1px solid #262a34; border-radius: 4px;
+         background: #000; cursor: pointer; padding: 0; }
   form { display: flex; flex-direction: column; gap: 10px; min-width: 340px; max-width: 420px; }
   form.hidden { display: none; }
   label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
@@ -68,6 +70,18 @@
       <label><span>h</span><input id="f_h" type="number" min="1" max="12"></label>
     </div>
     <label><span>colour</span><input id="f_color" type="color"></label>
+    <fieldset>
+      <legend><label style="gap:6px"><input id="f_haspix" type="checkbox" style="flex:0"> pixel art</label></legend>
+      <div id="pixWrap" style="display:none; flex-direction:column; gap:8px">
+        <div class="row" style="align-items:center">
+          <span style="font-size:12px; opacity:.8">brush</span>
+          <input id="f_brush" type="color" value="#ff3c78">
+          <button id="pixFill" type="button">fill with brush</button>
+        </div>
+        <div id="pixGrid" style="display:grid; gap:3px; width:max-content"></div>
+        <span class="hint">click a cell to paint it with the brush colour</span>
+      </div>
+    </fieldset>
     <label><span>action</span>
       <select id="f_type">
         <option value="shell">shell command</option>
@@ -126,7 +140,8 @@ function render() {
     for (let yy = b.y; yy < Math.min(b.y + (b.h || 3), 12); yy++)
       for (let xx = b.x; xx < Math.min(b.x + (b.w || 3), 12); xx++) {
         const c = cells[yy * 12 + xx];
-        c.style.background = rgbHex(b.color || [120, 120, 120]);
+        const px = b.pixels && b.pixels[yy - b.y] && b.pixels[yy - b.y][xx - b.x];
+        c.style.background = rgbHex(px || b.color || [120, 120, 120]);
         if (bi === sel) c.classList.add("sel");
       }
   });
@@ -154,6 +169,9 @@ function fillForm(b) {
     if (b.action && b.action.target === name) o.selected = true;
     ptSel.appendChild(o);
   }
+  $("f_haspix").checked = !!b.pixels;
+  $("pixWrap").style.display = b.pixels ? "flex" : "none";
+  if (b.pixels) buildPixGrid(b);
   $("f_hasstatus").checked = !!b.status;
   $("statusFields").style.display = b.status ? "flex" : "none";
   if (b.status) {
@@ -171,6 +189,12 @@ function applyForm() {
   b.x = +$("f_x").value; b.y = +$("f_y").value;
   b.w = +$("f_w").value; b.h = +$("f_h").value;
   b.color = hexRgb($("f_color").value);
+  if ($("f_haspix").checked) {
+    const w = b.w, h = b.h, old = b.pixels || [];
+    b.pixels = Array.from({length: h}, (_, y) =>
+      Array.from({length: w}, (_, x) => (old[y] && old[y][x]) || b.color.slice()));
+    buildPixGrid(b);
+  } else delete b.pixels;
   const t = $("f_type").value;
   if (t === "page") b.action = { type: "page", target: $("f_pagetarget").value };
   else if (t === "open") b.action = { type: "open", target: $("f_cmd").value };
@@ -197,7 +221,30 @@ function cellClick(x, y) {
   render();
 }
 
-form.addEventListener("input", applyForm);
+function buildPixGrid(b) {
+  const g = $("pixGrid");
+  g.style.gridTemplateColumns = `repeat(${b.w}, 22px)`;
+  g.innerHTML = "";
+  for (let y = 0; y < b.h; y++) for (let x = 0; x < b.w; x++) {
+    const c = document.createElement("button");
+    c.type = "button"; c.className = "pix";
+    c.style.background = rgbHex(b.pixels[y][x]);
+    c.addEventListener("click", () => {
+      b.pixels[y][x] = hexRgb($("f_brush").value);
+      c.style.background = $("f_brush").value;
+      render();
+    });
+    g.appendChild(c);
+  }
+}
+$("pixFill").addEventListener("click", () => {
+  if (sel < 0) return;
+  const b = buttons()[sel];
+  if (!b.pixels) return;
+  b.pixels = b.pixels.map((row) => row.map(() => hexRgb($("f_brush").value)));
+  buildPixGrid(b); render();
+});
+form.addEventListener("input", (e) => { if (e.target.id !== "f_brush") applyForm(); });
 $("delBtn").addEventListener("click", () => { if (sel >= 0) { buttons().splice(sel, 1); sel = -1; render(); } });
 $("pageSel").addEventListener("change", (e) => { page = e.target.value; sel = -1; render(); });
 $("addPage").addEventListener("click", () => {
