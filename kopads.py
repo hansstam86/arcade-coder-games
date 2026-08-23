@@ -51,7 +51,7 @@ class PadButton:
 
     def __init__(self, spec: dict) -> None:
         self.x, self.y = int(spec["x"]), int(spec["y"])
-        self.w, self.h = int(spec.get("w", 2)), int(spec.get("h", 2))
+        self.w, self.h = int(spec.get("w", 1)), int(spec.get("h", 1))
         self.label = spec.get("label", "pad")
         self.color = tuple(spec.get("color", [240, 90, 0]))
         self.midi = spec.get("midi", {})

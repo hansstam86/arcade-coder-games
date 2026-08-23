@@ -58,8 +58,9 @@
 <main>
   <div>
     <div class="grid" id="grid"></div>
-    <p class="hint">Four bands = EP-133 groups A–D, columns = pads.<br>
-      Click a pad to override its note or colour.</p>
+    <p class="hint">Bands mode: four bands = EP-133 groups A–D, columns = pads.<br>
+      Custom mode: every pad is its own button — click one to give it a colour
+      and MIDI action, click an empty pad to create one (1×1 by default).</p>
   </div>
   <div class="col">
     <fieldset>
@@ -144,7 +145,7 @@ for (let y = 0; y < 12; y++) for (let x = 0; x < 12; x++) {
       if (hit >= 0) selBtn = hit;
       else {
         cfg.buttons = cfg.buttons || [];
-        cfg.buttons.push({ x: Math.min(x, 10), y: Math.min(y, 10), w: 2, h: 2,
+        cfg.buttons.push({ x, y, w: 1, h: 1,
           label: "pad", color: [240, 90, 0], midi: { type: "note", note: 36 } });
         selBtn = cfg.buttons.length - 1;
       }
@@ -293,19 +294,20 @@ $("mode").addEventListener("change", () => {
 });
 $("convert").addEventListener("click", () => {
   cfg.buttons = [];
-  for (let band = 0; band < 4; band++) {
-    for (let col = 0; col < 12; col++) {
-      const ov = findOv(band, col) || {};
+  for (let y = 0; y < 12; y++) {
+    const band = Math.floor(y / 3);
+    for (let x = 0; x < 12; x++) {
+      const ov = findOv(band, x) || {};
       cfg.buttons.push({
-        x: col, y: band * 3, w: 1, h: 3,
-        label: `${cfg.bands[band].group}${PAD_NAMES[col]}`,
+        x, y, w: 1, h: 1,
+        label: `${cfg.bands[band].group}${PAD_NAMES[x]}`,
         color: ov.color || cfg.bands[band].color,
-        midi: { type: "note", note: ov.note != null ? ov.note : cfg.bands[band].base_note + col },
+        midi: { type: "note", note: ov.note != null ? ov.note : cfg.bands[band].base_note + x },
       });
     }
   }
   cfg.layout = "custom"; sel = null; selBtn = -1; render();
-  msg.textContent = "converted — every pad is now an editable button";
+  msg.textContent = "converted — all 144 pads are now individual buttons";
 });
 
 function upsertOv(patch) {
