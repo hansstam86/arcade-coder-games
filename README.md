@@ -168,6 +168,20 @@ colour overrides, and a send-test-note button. Saves hot-reload live.
 echo kopads_hw.py > launch_target.txt && open ArcadeMinesweeper.app
 ```
 
+## Step sequencer
+
+[seq.py](seq.py) makes the board a hardware sequencer driving the EP-133:
+rows 0-9 are ten tracks (MIDI notes, default EP-133 group A pads), columns are
+12 sixteenth-note steps. Tap to toggle steps while it plays; a dedicated
+timing thread fires the MIDI with ~1 ms steady-state precision, independent of
+the BLE frame rate. Bottom row: play/stop (pulses on the beat), tempo -/+,
+clear (press twice). Pattern auto-saves to `seq.json` (hot-editable — change
+track notes/colours there).
+
+```bash
+echo seq_hw.py > launch_target.txt && open ArcadeMinesweeper.app
+```
+
 ## MIDI visualizer
 
 [midiviz.py](midiviz.py) turns the board into a light show while you play the
