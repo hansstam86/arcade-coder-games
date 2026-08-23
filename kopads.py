@@ -46,6 +46,21 @@ def log(msg: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
+class PadButton:
+    """A free-form button in custom layout mode."""
+
+    def __init__(self, spec: dict) -> None:
+        self.x, self.y = int(spec["x"]), int(spec["y"])
+        self.w, self.h = int(spec.get("w", 2)), int(spec.get("h", 2))
+        self.label = spec.get("label", "pad")
+        self.color = tuple(spec.get("color", [240, 90, 0]))
+        self.midi = spec.get("midi", {})
+        self.toggled = False
+
+    def contains(self, x: int, y: int) -> bool:
+        return self.x <= x < self.x + self.w and self.y <= y < self.y + self.h
+
+
 class KOPads(Game):
     fps = 10
 
@@ -75,6 +90,10 @@ class KOPads(Game):
         self.overrides = {
             (o["band"], o["col"]): o for o in cfg.get("overrides", [])
         }
+        self.custom = (
+            [PadButton(b) for b in cfg.get("buttons", [])]
+            if cfg.get("layout") == "custom" else None
+        )
 
     # -- MIDI plumbing -------------------------------------------------------
     def _open_port(self, now: float) -> None:
@@ -98,14 +117,11 @@ class KOPads(Game):
         except Exception as exc:  # noqa: BLE001
             log(f"could not open MIDI port {name!r}: {exc!r}")
 
-    def _send(self, kind: str, note: int) -> None:
+    def _send_msg(self, msg) -> None:
         if self.port is None:
             return
-        import mido
-
         try:
-            self.port.send(mido.Message(kind, note=note, velocity=self.cfg["velocity"],
-                                        channel=self.cfg["channel"]))
+            self.port.send(msg)
         except Exception as exc:  # noqa: BLE001
             log(f"MIDI send failed ({exc!r}); reopening port")
             try:
@@ -115,8 +131,51 @@ class KOPads(Game):
             self.port = None
             self.next_port_try = 0.0
 
+    def _send(self, kind: str, note: int, velocity: int | None = None,
+              channel: int | None = None) -> None:
+        import mido
+
+        self._send_msg(mido.Message(
+            kind, note=note,
+            velocity=self.cfg["velocity"] if velocity is None else velocity,
+            channel=self.cfg["channel"] if channel is None else channel))
+
+    def _send_cc(self, cc: int, value: int, channel: int | None = None) -> None:
+        import mido
+
+        self._send_msg(mido.Message(
+            "control_change", control=cc, value=value,
+            channel=self.cfg["channel"] if channel is None else channel))
+
+    def _fire(self, midi: dict, now: float) -> str:
+        """Send a custom-button MIDI event; returns a log description."""
+        channel = midi.get("channel")
+        if midi.get("type") == "cc":
+            value = int(midi.get("value", 127))
+            self._send_cc(int(midi.get("cc", 1)), value, channel)
+            return f"cc {midi.get('cc', 1)} = {value}"
+        note = int(midi.get("note", 60))
+        self._send("note_on", note, midi.get("velocity"), channel)
+        self.active[(channel if channel is not None else self.cfg["channel"], note)] = (
+            now + float(midi.get("note_seconds", self.cfg["note_seconds"])))
+        return f"note {note}"
+
     # -- game hooks ----------------------------------------------------------
     def on_press(self, x, y):
+        now = time.monotonic()
+        if self.custom is not None:
+            for btn in self.custom:
+                if not btn.contains(x, y):
+                    continue
+                midi = dict(btn.midi)
+                if midi.get("type") == "cc" and midi.get("mode") == "toggle":
+                    btn.toggled = not btn.toggled
+                    midi["value"] = midi.get("on_value", 127) if btn.toggled else midi.get("off_value", 0)
+                desc = self._fire(midi, now)
+                log(f"button '{btn.label}': {desc}" + ("" if self.port else "  (no MIDI device yet)"))
+                self.flashes[("btn", id(btn))] = now + 0.22
+                return
+            return
         band = min(y // 3, 3)
         spec = self.cfg["bands"][band]
         override = self.overrides.get((band, x), {})
@@ -125,7 +184,7 @@ class KOPads(Game):
         log(f"group {spec['group']} pad {pad_names[x] if x < 12 else x} -> note {note}"
             + ("" if self.port else "  (no MIDI device yet)"))
         self._send("note_on", note)
-        self.active[note] = time.monotonic() + float(self.cfg["note_seconds"])
+        self.active[(self.cfg["channel"], note)] = time.monotonic() + float(self.cfg["note_seconds"])
         self.flashes[(band, x)] = time.monotonic() + 0.22
 
     def update(self, dt):
@@ -145,20 +204,39 @@ class KOPads(Game):
             from kopads_web import test_notes
 
             while not test_notes.empty():
-                note = test_notes.get_nowait()
-                log(f"test note {note}")
-                self._send("note_on", note)
-                self.active[note] = now + float(self.cfg["note_seconds"])
+                ev = test_notes.get_nowait()
+                if isinstance(ev, dict):
+                    log(f"test event: {self._fire(ev, now)}")
+                else:
+                    log(f"test note {ev}")
+                    self._send("note_on", ev)
+                    self.active[(self.cfg["channel"], ev)] = now + float(self.cfg["note_seconds"])
         except Exception:
             pass
-        for note, off_at in list(self.active.items()):
+        for (channel, note), off_at in list(self.active.items()):
             if now >= off_at:
-                self._send("note_off", note)
-                del self.active[note]
+                self._send("note_off", note, channel=channel)
+                del self.active[(channel, note)]
         self.flashes = {k: t for k, t in self.flashes.items() if t > now}
 
     def draw(self, screen):
         now = time.monotonic()
+        if self.custom is not None:
+            screen.clear((3, 3, 5))
+            for btn in self.custom:
+                color = btn.color
+                if btn.midi.get("type") == "cc" and btn.midi.get("mode") == "toggle":
+                    color = btn.color if btn.toggled else tuple(v // 4 for v in btn.color)
+                if ("btn", id(btn)) in self.flashes:
+                    color = (255, 255, 255)
+                for dy in range(btn.h):
+                    for dx in range(btn.w):
+                        if btn.x + dx < 12 and btn.y + dy < 12:
+                            screen.set(btn.x + dx, btn.y + dy, color)
+            if self.port is None and int(now * 2) % 2:
+                for x, y in ((0, 0), (11, 0), (0, 11), (11, 11)):
+                    screen.set(x, y, (120, 0, 0))
+            return
         for band in range(4):
             base = self.cfg["bands"][band]["color"]
             for col in range(12):

@@ -22,9 +22,9 @@
       "group": "B",
       "base_note": 48,
       "color": [
-        220,
-        200,
-        0
+        219,
+        0,
+        179
       ]
     },
     {
@@ -46,5 +46,13 @@
       ]
     }
   ],
-  "overrides": []
+  "overrides": [
+    {
+      "band": 1,
+      "col": 5,
+      "note": 70
+    }
+  ],
+  "buttons": [],
+  "layout": "bands"
 }

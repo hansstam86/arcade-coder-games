@@ -46,6 +46,11 @@
 <header>
   <h1>KO-pads Editor</h1>
   <span class="hint">EP-133 K.O. II mapping for the Arcade Coder</span>
+  <select id="mode">
+    <option value="bands">bands layout</option>
+    <option value="custom">custom layout</option>
+  </select>
+  <button id="convert" title="turn the current band mapping into 48 editable buttons">bands &rarr; custom</button>
   <div class="spacer"></div>
   <span id="msg"></span>
   <button id="save">&#10003; Save</button>
@@ -72,6 +77,38 @@
       </div>
       <label><span>port match</span><input id="g_port" placeholder="EP-133, EP133"></label>
     </fieldset>
+    <fieldset id="btnBox" style="display:none">
+      <legend>selected button</legend>
+      <label><span>label</span><input id="b_label"></label>
+      <div class="row">
+        <label><span>x</span><input id="b_x" type="number" min="0" max="11"></label>
+        <label><span>y</span><input id="b_y" type="number" min="0" max="11"></label>
+        <label><span>w</span><input id="b_w" type="number" min="1" max="12"></label>
+        <label><span>h</span><input id="b_h" type="number" min="1" max="12"></label>
+      </div>
+      <label><span>colour</span><input id="b_col" type="color"></label>
+      <label><span>event</span>
+        <select id="b_kind">
+          <option value="note">note</option>
+          <option value="cc">CC (momentary)</option>
+          <option value="cc_toggle">CC (toggle)</option>
+        </select>
+      </label>
+      <div class="row" id="b_noteRow">
+        <label><span>note</span><input id="b_note" type="number" min="0" max="127"></label>
+        <label><span>velocity</span><input id="b_vel" type="number" min="1" max="127" placeholder="global"></label>
+      </div>
+      <div class="row" id="b_ccRow" style="display:none">
+        <label><span>CC#</span><input id="b_cc" type="number" min="0" max="127"></label>
+        <label><span>value</span><input id="b_val" type="number" min="0" max="127" value="127"></label>
+        <label id="b_offRow" style="display:none"><span>off value</span><input id="b_off" type="number" min="0" max="127" value="0"></label>
+      </div>
+      <label><span>channel</span><input id="b_ch" type="number" min="1" max="16" placeholder="global"></label>
+      <div class="row">
+        <button id="b_test">&#9654; test</button>
+        <button id="b_del" style="border-color:#6e2c2c;color:#eeb7b7">delete button</button>
+      </div>
+    </fieldset>
     <fieldset id="padBox" style="display:none">
       <legend>selected pad</legend>
       <div class="row"><span id="padInfo" style="font-size:13px"></span></div>
@@ -88,7 +125,7 @@
 <script>
 const LOCAL = location.origin.startsWith("http://127.0.0.1") || location.origin.startsWith("http://localhost");
 const API = LOCAL ? "" : "http://127.0.0.1:7799";
-let connected = false, cfg = null, sel = null;   // sel = {band, col}
+let connected = false, cfg = null, sel = null, selBtn = -1;  // bands sel / custom sel
 const $ = (id) => document.getElementById(id);
 const msg = $("msg");
 const rgbHex = (a) => "#" + a.map((v) => v.toString(16).padStart(2, "0")).join("");
@@ -100,13 +137,33 @@ const cells = [];
 for (let y = 0; y < 12; y++) for (let x = 0; x < 12; x++) {
   const c = document.createElement("button");
   c.className = "cell" + (y % 3 === 0 && y > 0 ? " bandgap" : "");
-  c.addEventListener("click", () => { sel = { band: Math.floor(y / 3), col: x }; render(); });
+  c.addEventListener("click", () => {
+    if (cfg.layout === "custom") {
+      const hit = (cfg.buttons || []).findIndex((b) =>
+        b.x <= x && x < b.x + (b.w || 2) && b.y <= y && y < b.y + (b.h || 2));
+      if (hit >= 0) selBtn = hit;
+      else {
+        cfg.buttons = cfg.buttons || [];
+        cfg.buttons.push({ x: Math.min(x, 10), y: Math.min(y, 10), w: 2, h: 2,
+          label: "pad", color: [240, 90, 0], midi: { type: "note", note: 36 } });
+        selBtn = cfg.buttons.length - 1;
+      }
+    } else {
+      sel = { band: Math.floor(y / 3), col: x };
+    }
+    render();
+  });
   grid.appendChild(c); cells.push(c);
 }
 
 const findOv = (b, c) => (cfg.overrides || []).find((o) => o.band === b && o.col === c);
 
 function render() {
+  $("mode").value = cfg.layout === "custom" ? "custom" : "bands";
+  if (cfg.layout === "custom") { renderCustom(); return; }
+  $("bands").parentElement.style.display = "";
+  $("padBox").style.display = sel ? "flex" : "none";
+  $("btnBox").style.display = "none";
   for (let y = 0; y < 12; y++) for (let x = 0; x < 12; x++) {
     const band = Math.floor(y / 3);
     const ov = findOv(band, x);
@@ -150,6 +207,106 @@ function render() {
     $("p_col").value = rgbHex((ov && ov.color) || band.color);
   }
 }
+
+function renderCustom() {
+  $("bands").parentElement.style.display = "none";
+  $("padBox").style.display = "none";
+  cells.forEach((c) => { c.style.background = "#0a0b0f"; c.classList.remove("sel"); });
+  (cfg.buttons || []).forEach((b, bi) => {
+    for (let yy = b.y; yy < Math.min(b.y + (b.h || 2), 12); yy++)
+      for (let xx = b.x; xx < Math.min(b.x + (b.w || 2), 12); xx++) {
+        const c = cells[yy * 12 + xx];
+        c.style.background = rgbHex(b.color || [240, 90, 0]);
+        if (bi === selBtn) c.classList.add("sel");
+      }
+  });
+  const box = $("btnBox");
+  const b = (cfg.buttons || [])[selBtn];
+  box.style.display = b ? "flex" : "none";
+  if (!b) return;
+  $("b_label").value = b.label || "";
+  $("b_x").value = b.x; $("b_y").value = b.y;
+  $("b_w").value = b.w || 2; $("b_h").value = b.h || 2;
+  $("b_col").value = rgbHex(b.color || [240, 90, 0]);
+  const m = b.midi || {};
+  const kind = m.type === "cc" ? (m.mode === "toggle" ? "cc_toggle" : "cc") : "note";
+  $("b_kind").value = kind;
+  $("b_noteRow").style.display = kind === "note" ? "" : "none";
+  $("b_ccRow").style.display = kind === "note" ? "none" : "";
+  $("b_offRow").style.display = kind === "cc_toggle" ? "" : "none";
+  $("b_note").value = m.note ?? 36;
+  $("b_vel").value = m.velocity ?? "";
+  $("b_cc").value = m.cc ?? 12;
+  $("b_val").value = (kind === "cc_toggle" ? m.on_value : m.value) ?? 127;
+  $("b_off").value = m.off_value ?? 0;
+  $("b_ch").value = m.channel != null ? m.channel + 1 : "";
+}
+
+function applyBtnForm() {
+  const b = (cfg.buttons || [])[selBtn];
+  if (!b) return;
+  b.label = $("b_label").value;
+  b.x = +$("b_x").value; b.y = +$("b_y").value;
+  b.w = +$("b_w").value || 2; b.h = +$("b_h").value || 2;
+  b.color = hexRgb($("b_col").value);
+  const kind = $("b_kind").value;
+  const m = { };
+  if (kind === "note") {
+    m.type = "note"; m.note = Math.min(127, Math.max(0, +$("b_note").value || 0));
+    if ($("b_vel").value !== "") m.velocity = Math.min(127, Math.max(1, +$("b_vel").value));
+  } else {
+    m.type = "cc"; m.cc = Math.min(127, Math.max(0, +$("b_cc").value || 0));
+    if (kind === "cc_toggle") {
+      m.mode = "toggle";
+      m.on_value = Math.min(127, Math.max(0, +$("b_val").value || 0));
+      m.off_value = Math.min(127, Math.max(0, +$("b_off").value || 0));
+    } else {
+      m.value = Math.min(127, Math.max(0, +$("b_val").value || 0));
+    }
+  }
+  if ($("b_ch").value !== "") m.channel = Math.min(15, Math.max(0, (+$("b_ch").value || 1) - 1));
+  b.midi = m;
+  render();
+}
+
+["b_label","b_x","b_y","b_w","b_h","b_col","b_kind","b_note","b_vel","b_cc","b_val","b_off","b_ch"]
+  .forEach((id) => $(id).addEventListener("input", applyBtnForm));
+$("b_del").addEventListener("click", () => {
+  if (selBtn >= 0) { cfg.buttons.splice(selBtn, 1); selBtn = -1; render(); }
+});
+$("b_test").addEventListener("click", async () => {
+  const b = (cfg.buttons || [])[selBtn];
+  if (!b) return;
+  if (!connected) { msg.textContent = "no local KO-pads running — can't test"; return; }
+  const midi = { ...b.midi };
+  if (midi.type === "cc" && midi.mode === "toggle") { midi.value = midi.on_value ?? 127; delete midi.mode; }
+  try {
+    await fetch(API + "/test", { method: "POST", body: JSON.stringify({ midi }),
+      headers: { "Content-Type": "application/json" } });
+    msg.textContent = "sent " + (midi.type === "cc" ? `CC ${midi.cc}` : `note ${midi.note}`);
+  } catch (e) { msg.textContent = "test failed"; }
+});
+$("mode").addEventListener("change", () => {
+  cfg.layout = $("mode").value === "custom" ? "custom" : "bands";
+  if (cfg.layout === "custom" && !(cfg.buttons || []).length) cfg.buttons = [];
+  sel = null; selBtn = -1; render();
+});
+$("convert").addEventListener("click", () => {
+  cfg.buttons = [];
+  for (let band = 0; band < 4; band++) {
+    for (let col = 0; col < 12; col++) {
+      const ov = findOv(band, col) || {};
+      cfg.buttons.push({
+        x: col, y: band * 3, w: 1, h: 3,
+        label: `${cfg.bands[band].group}${PAD_NAMES[col]}`,
+        color: ov.color || cfg.bands[band].color,
+        midi: { type: "note", note: ov.note != null ? ov.note : cfg.bands[band].base_note + col },
+      });
+    }
+  }
+  cfg.layout = "custom"; sel = null; selBtn = -1; render();
+  msg.textContent = "converted — every pad is now an editable button";
+});
 
 function upsertOv(patch) {
   cfg.overrides = cfg.overrides || [];

@@ -35,6 +35,19 @@ def _validate(cfg: dict) -> str | None:
         return "channel must be 0..15"
     if not isinstance(cfg.get("velocity"), int) or not 1 <= cfg["velocity"] <= 127:
         return "velocity must be 1..127"
+    if cfg.get("layout") == "custom":
+        for b in cfg.get("buttons", []):
+            for key in ("x", "y"):
+                if not isinstance(b.get(key), int) or not 0 <= b[key] < 12:
+                    return f"button '{b.get('label', '?')}': bad {key}"
+            m = b.get("midi", {})
+            if m.get("type") not in ("note", "cc"):
+                return f"button '{b.get('label', '?')}': midi.type must be note or cc"
+            for k in ("note", "cc", "value", "on_value", "off_value", "velocity"):
+                if k in m and not (isinstance(m[k], int) and 0 <= m[k] <= 127):
+                    return f"button '{b.get('label', '?')}': bad {k}"
+            if "channel" in m and not (isinstance(m["channel"], int) and 0 <= m["channel"] <= 15):
+                return f"button '{b.get('label', '?')}': bad channel"
     for o in cfg.get("overrides", []):
         if not (isinstance(o.get("band"), int) and 0 <= o["band"] < 4):
             return "override: bad band"
@@ -92,7 +105,11 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/test":
             note = body.get("note")
-            if isinstance(note, int) and 0 <= note <= 127:
+            midi = body.get("midi")
+            if isinstance(midi, dict) and midi.get("type") in ("note", "cc"):
+                test_notes.put(midi)
+                self._send(200, b"queued", "text/plain")
+            elif isinstance(note, int) and 0 <= note <= 127:
                 test_notes.put(note)
                 self._send(200, b"queued", "text/plain")
             else:
