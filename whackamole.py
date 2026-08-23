@@ -28,11 +28,7 @@ class Mole:
         self.x, self.y, self.expiry = x, y, expiry
 
     def cells(self) -> list[int]:
-        return [
-            (self.y + dy) * W + (self.x + dx)
-            for dy in (0, 1)
-            for dx in (0, 1)
-        ]
+        return [self.y * W + self.x]
 
 
 class Game:
@@ -51,7 +47,7 @@ class Game:
         return max(0.7, 1.8 - self.score * 0.03)
 
     def lifetime(self) -> float:
-        return max(0.9, 2.6 - self.score * 0.05)
+        return max(1.1, 3.0 - self.score * 0.05)
 
     def occupied(self) -> set[int]:
         return {c for m in self.moles for c in m.cells()}
@@ -59,8 +55,8 @@ class Game:
     def spawn(self) -> None:
         taken = self.occupied()
         for _ in range(40):
-            x = random.randrange(0, W - 1)
-            y = random.randrange(0, PLAY_ROWS - 1)
+            x = random.randrange(0, W)
+            y = random.randrange(0, PLAY_ROWS)
             mole = Mole(x, y, time.monotonic() + self.lifetime())
             if not (set(mole.cells()) & taken):
                 self.moles.append(mole)
