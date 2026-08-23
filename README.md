@@ -168,6 +168,17 @@ colour overrides, and a send-test-note button. Saves hot-reload live.
 echo kopads_hw.py > launch_target.txt && open ArcadeMinesweeper.app
 ```
 
+## MIDI visualizer
+
+[midiviz.py](midiviz.py) turns the board into a light show while you play the
+EP-133 itself: every pad you hit spawns a velocity-sensitive, group-coloured
+ripple at that pad's position (A orange / B yellow / C white / D red), and the
+FX knobs (CC 12/13) tint the background. Pressing the board makes splashes too.
+
+```bash
+echo midiviz_hw.py > launch_target.txt && open ArcadeMinesweeper.app
+```
+
 ## Setup (macOS)
 
 ```bash
