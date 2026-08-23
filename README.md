@@ -142,7 +142,11 @@ echo deck_hw.py > launch_target.txt && open ArcadeMinesweeper.app   # real board
 ```
 
 While the deck runs it serves a **visual config editor at
-http://127.0.0.1:7788**: click a pad to edit or create a button, pick colour
+http://127.0.0.1:7788** — also hosted at
+[hansstam86.github.io/arcade-coder-games/deck.html](https://hansstam86.github.io/arcade-coder-games/deck.html),
+which connects to your locally running deck (or falls back to a demo where
+Save downloads `deck.json`). Buttons can be any size from 1×1 up (the default
+layout is 2×2). click a pad to edit or create a button, pick colour
 and action in the form, manage pages, and Save — the running deck hot-reloads
 `deck.json` within a second, so the physical board updates live. Hand-editing
 `deck.json` hot-reloads too.

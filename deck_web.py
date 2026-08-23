@@ -17,6 +17,20 @@ EDITOR = ROOT / "deck_editor.html"
 
 _started = False
 
+# Origins allowed to use the API cross-origin (the hosted editor). Anything
+# else with an Origin header is rejected — a malicious page must not be able
+# to write commands into deck.json.
+ALLOWED_ORIGINS = {"https://hansstam86.github.io"}
+
+
+def _origin_ok(origin: str) -> bool:
+    return (
+        not origin
+        or origin in ALLOWED_ORIGINS
+        or origin.startswith("http://127.0.0.1")
+        or origin.startswith("http://localhost")
+    )
+
 
 def _validate(cfg: dict) -> str | None:
     if not isinstance(cfg.get("pages"), dict) or not cfg["pages"]:
@@ -42,8 +56,22 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
+        origin = self.headers.get("Origin", "")
+        if origin and _origin_ok(origin):
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
         self.end_headers()
         self.wfile.write(body)
+
+    def do_OPTIONS(self):
+        origin = self.headers.get("Origin", "")
+        self.send_response(204 if _origin_ok(origin) else 403)
+        if origin and _origin_ok(origin):
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header("Vary", "Origin")
+        self.end_headers()
 
     def do_GET(self):
         if self.path == "/":
@@ -54,6 +82,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, b"not found", "text/plain")
 
     def do_POST(self):
+        if not _origin_ok(self.headers.get("Origin", "")):
+            self._send(403, b"origin not allowed", "text/plain")
+            return
         if self.path != "/config":
             self._send(404, b"not found", "text/plain")
             return
