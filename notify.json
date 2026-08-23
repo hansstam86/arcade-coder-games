@@ -1,0 +1,38 @@
+{
+  "rules": [
+    {
+      "name": "slack",
+      "app_contains": "slack",
+      "title_contains": "",
+      "color": [
+        240,
+        120,
+        0
+      ],
+      "style": "border",
+      "note": 39,
+      "velocity": 110,
+      "channel": 0,
+      "duration": 2.5,
+      "cooldown": 4,
+      "enabled": true
+    },
+    {
+      "name": "mail",
+      "app_contains": "mail",
+      "title_contains": "",
+      "color": [
+        0,
+        90,
+        240
+      ],
+      "style": "corner",
+      "note": 37,
+      "velocity": 100,
+      "channel": 0,
+      "duration": 2.0,
+      "cooldown": 8,
+      "enabled": true
+    }
+  ]
+}

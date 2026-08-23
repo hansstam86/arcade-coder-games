@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arcade Notifications</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: #14161c; color: #9aa3b2;
+         font-family: system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+           background: #1b1d24; border-bottom: 1px solid #262a34; }
+  h1 { font-size: 15px; font-weight: 600; color: #d5dae4; margin: 0; }
+  .spacer { flex: 1; }
+  button, select, input {
+    padding: 6px 10px; border: 1px solid #3a3f4c; border-radius: 8px;
+    background: #1d2027; color: #c6cdd9; font: 500 13px system-ui;
+  }
+  button { cursor: pointer; }
+  button:hover { background: #262b35; }
+  #save { background: #1d4a2b; border-color: #2c6e40; color: #b7eec6; }
+  #msg { font-size: 12px; opacity: .8; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px; display: flex;
+         flex-direction: column; gap: 14px; }
+  .rule { border: 1px solid #262a34; border-radius: 12px; padding: 14px;
+          display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+          gap: 10px; background: #191b22; }
+  .rule.off { opacity: .45; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 11px;
+          opacity: .85; }
+  label input, label select { width: 100%; }
+  .rule .actions { display: flex; gap: 8px; align-items: end; }
+  .danger { border-color: #6e2c2c; color: #eeb7b7; }
+  .status { border: 1px solid #262a34; border-radius: 12px; padding: 14px;
+            font-size: 12px; background: #15171d; }
+  .status b { color: #c6cdd9; }
+  .status ul { margin: 8px 0 0; padding-left: 18px; }
+  .hint { font-size: 12px; opacity: .65; }
+  code { background: #1d2027; padding: 1px 5px; border-radius: 5px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Arcade Notifications</h1>
+  <span class="hint">see them on the board, hear them on the EP-133</span>
+  <div class="spacer"></div>
+  <span id="msg"></span>
+  <button id="add">+ rule</button>
+  <button id="save">&#10003; Save</button>
+</header>
+<main>
+  <div class="status" id="status">connecting&hellip;</div>
+  <div id="rules"></div>
+  <p class="hint">Anything can trigger a rule via the webhook:
+    <code>curl -X POST http://127.0.0.1:7760/notify -d '{"app":"slack","title":"hey"}'</code></p>
+</main>
+<script>
+const LOCAL = location.origin.startsWith("http://127.0.0.1") || location.origin.startsWith("http://localhost");
+const API = LOCAL ? "" : "http://127.0.0.1:7760";
+let cfg = null, connected = false;
+const $ = (id) => document.getElementById(id);
+const msg = $("msg");
+const rgbHex = (a) => "#" + a.map((v) => v.toString(16).padStart(2, "0")).join("");
+const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+
+function render() {
+  const root = $("rules");
+  root.innerHTML = "";
+  cfg.rules.forEach((r, i) => {
+    const div = document.createElement("div");
+    div.className = "rule" + (r.enabled === false ? " off" : "");
+    div.innerHTML = `
+      <label>name<input data-k="name" value="${r.name || ""}"></label>
+      <label>app contains<input data-k="app_contains" value="${r.app_contains || ""}"></label>
+      <label>title contains<input data-k="title_contains" value="${r.title_contains || ""}"></label>
+      <label>colour<input data-k="color" type="color" value="${rgbHex(r.color || [240,120,0])}"></label>
+      <label>style<select data-k="style">
+        <option value="border"${r.style === "border" ? " selected" : ""}>border pulse</option>
+        <option value="flash"${r.style === "flash" ? " selected" : ""}>full flash</option>
+        <option value="corner"${r.style === "corner" ? " selected" : ""}>corner glow</option>
+      </select></label>
+      <label>EP-133 note<input data-k="note" type="number" min="0" max="127" value="${r.note ?? 39}"></label>
+      <label>velocity<input data-k="velocity" type="number" min="1" max="127" value="${r.velocity ?? 110}"></label>
+      <label>duration s<input data-k="duration" type="number" step="0.5" min="0.5" value="${r.duration ?? 2.5}"></label>
+      <label>cooldown s<input data-k="cooldown" type="number" min="0" value="${r.cooldown ?? 4}"></label>
+      <label>enabled<select data-k="enabled">
+        <option value="yes"${r.enabled !== false ? " selected" : ""}>yes</option>
+        <option value="no"${r.enabled === false ? " selected" : ""}>no</option>
+      </select></label>
+      <div class="actions">
+        <button data-act="test">&#9654; test</button>
+        <button data-act="del" class="danger">delete</button>
+      </div>`;
+    div.querySelectorAll("input,select").forEach((inp) => inp.addEventListener("input", () => {
+      const k = inp.dataset.k;
+      if (k === "color") r.color = hexRgb(inp.value);
+      else if (k === "enabled") r.enabled = inp.value === "yes";
+      else if (["note", "velocity", "cooldown"].includes(k)) r[k] = +inp.value || 0;
+      else if (k === "duration") r[k] = +inp.value || 2.5;
+      else r[k] = inp.value;
+      div.className = "rule" + (r.enabled === false ? " off" : "");
+    }));
+    div.querySelector('[data-act="test"]').addEventListener("click", async () => {
+      if (!connected) { msg.textContent = "no local service"; return; }
+      await fetch(API + "/test", { method: "POST", body: JSON.stringify({ rule: i }),
+        headers: { "Content-Type": "application/json" } });
+      msg.textContent = `fired '${r.name}'`;
+    });
+    div.querySelector('[data-act="del"]').addEventListener("click", () => {
+      cfg.rules.splice(i, 1); render();
+    });
+    root.appendChild(div);
+  });
+}
+
+$("add").addEventListener("click", () => {
+  cfg.rules.push({ name: "new rule", app_contains: "", title_contains: "",
+    color: [0, 200, 0], style: "border", note: 40, velocity: 110,
+    channel: 0, duration: 2.5, cooldown: 4, enabled: true });
+  render();
+});
+
+$("save").addEventListener("click", async () => {
+  if (connected) {
+    const res = await fetch(API + "/rules", { method: "POST",
+      body: JSON.stringify({ rules: cfg.rules }),
+      headers: { "Content-Type": "application/json" } });
+    msg.textContent = res.ok ? "saved" : "error: " + (await res.text());
+  } else {
+    const blob = new Blob([JSON.stringify(cfg, null, 2) + "\n"], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "notify.json";
+    a.click();
+    msg.textContent = "downloaded notify.json";
+  }
+});
+
+async function pollStatus() {
+  if (!connected) return;
+  try {
+    const s = await (await fetch(API + "/status")).json();
+    const recent = (s.recent || []).map((n) =>
+      `<li><b>${n.app}</b> — ${n.title || "(no title)"}</li>`).join("");
+    $("status").innerHTML =
+      `Notification Center: <b>${s.nc_status}</b><br>recent notifications seen:` +
+      (recent ? `<ul>${recent}</ul>` : " <i>none yet</i>");
+  } catch (e) { connected = false; $("status").textContent = "lost connection"; }
+}
+
+(async () => {
+  try {
+    cfg = await (await fetch(API + "/rules")).json();
+    connected = true;
+  } catch (e) {
+    cfg = { rules: [] };
+    $("status").textContent = LOCAL
+      ? "service not responding"
+      : "no local ArcadeOS found — run it, allow local-network access if Chrome asks, then reload. Save downloads notify.json instead.";
+    $("save").textContent = "⬇ Download notify.json";
+  }
+  render();
+  pollStatus();
+  setInterval(pollStatus, 4000);
+})();
+</script>
+</body>
+</html>

@@ -142,6 +142,17 @@ echo arcadeos_hw.py > launch_target.txt && open ArcadeMinesweeper.app
 scripts/install_login.sh    # optional: start ArcadeOS at login
 ```
 
+## Notifications — see them on the board, hear them on the EP-133
+
+ArcadeOS runs a notification service: rules map alerts (e.g. Slack) to a
+coloured overlay on the board (border pulse / full flash / corner glow) over
+whatever app is running, plus an EP-133 note (load a clap where the rule
+points). Configure everything in the webapp at http://127.0.0.1:7760
+(hosted: [/notify.html](https://hansstam86.github.io/arcade-coder-games/notify.html)).
+Sources: the macOS Notification Center database (grant the app bundle Full
+Disk Access — the webapp shows the status) and a universal webhook:
+`curl -X POST http://127.0.0.1:7760/notify -d '{"app":"slack","title":"hi"}'`.
+
 ## ArcadeDeck — a customizable Stream Deck
 
 [deck.py](deck.py) turns the board into a 12×12 macro pad. Everything is

@@ -78,6 +78,13 @@ class ArcadeOS(Game):
             ensure_server()
         except Exception as exc:  # noqa: BLE001
             log(f"dashboard not started: {exc!r}")
+        self.notify = None
+        try:
+            from notifd import ensure_server as notify_server
+
+            self.notify = notify_server()
+        except Exception as exc:  # noqa: BLE001
+            log(f"notification service not started: {exc!r}")
         log("ArcadeOS home — press an icon: " + " ".join(n for n, *_ in APPS))
 
     # -- app switching -------------------------------------------------------
@@ -161,6 +168,8 @@ class ArcadeOS(Game):
     def draw(self, screen):
         if self.app is not None:
             self.app.draw(screen)
+            if self.notify:
+                self.notify.draw_overlay(screen, time.monotonic())
             return
         now = time.monotonic()
         screen.clear((0, 0, 0))
@@ -170,6 +179,8 @@ class ArcadeOS(Game):
         # heartbeat pixel so home doesn't look frozen
         pulse = int(40 + 30 * (0.5 + 0.5 * __import__("math").sin(now * 2)))
         screen.set(0, 11, (0, pulse, pulse // 2))
+        if self.notify:
+            self.notify.draw_overlay(screen, now)
 
 
 if __name__ == "__main__":

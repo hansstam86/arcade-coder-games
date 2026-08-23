@@ -20,5 +20,6 @@ cp deck.json docs/deck_sample.json
 cp kopads_editor.html docs/kopads.html
 cp kopads.json docs/kopads_sample.json
 cp arcadeos_dashboard.html docs/arcadeos.html
+cp notify_editor.html docs/notify.html
 
 echo "synced $(ls docs/py docs/py/arcadecoder docs/py/examples | wc -l | tr -d ' ') files into docs/py"
