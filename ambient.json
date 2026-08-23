@@ -1,0 +1,11 @@
+{
+  "rotate_minutes": 10,
+  "brightness": 100,
+  "clock_24h": true,
+  "night_dim": {
+    "start": 22,
+    "end": 8,
+    "brightness": 25
+  },
+  "scene": "rain"
+}

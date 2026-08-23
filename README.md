@@ -168,6 +168,18 @@ colour overrides, and a send-test-note button. Saves hot-reload live.
 echo kopads_hw.py > launch_target.txt && open ArcadeMinesweeper.app
 ```
 
+## Ambient mode
+
+[ambient.py](ambient.py): the board as a living desk object. Seven scenes —
+pixel clock with a day-cycle sky, fire, plasma, matrix rain, game of life
+(self-reseeding), starfield with shooting stars, dvd bounce. Press any pad
+for the next scene; auto-rotates every 10 minutes; dims itself at night.
+Configure rotation, brightness, night hours, and 12/24h in `ambient.json`.
+
+```bash
+echo ambient_hw.py > launch_target.txt && open ArcadeMinesweeper.app
+```
+
 ## Step sequencer
 
 [seq.py](seq.py) makes the board a hardware sequencer driving the EP-133:
