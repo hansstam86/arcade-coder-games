@@ -7,7 +7,9 @@ the **unmodified stock firmware**. No disassembly, no reflashing, no UART.
 **▶ Try it now, no hardware needed: [Arcade Coder Studio](https://hansstam86.github.io/arcade-coder-games/)** —
 a web IDE with the emulator built in. Write Python games in the browser (real
 Python via Pyodide, the actual `arcadecoder` SDK), run them on the virtual
-board, then run the identical file on real hardware with `--hw`.
+board — and in Chrome/Edge, hit **⚡ Run on board** to drive a real Arcade
+Coder over Web Bluetooth, straight from the page, nothing installed. The same
+file also runs locally with `--hw`.
 
 Working games — all launchable from an on-board menu ([arcade.py](arcade.py)):
 

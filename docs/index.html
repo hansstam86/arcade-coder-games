@@ -27,6 +27,8 @@
   button:disabled { opacity: .4; cursor: default; }
   #run { background: #1d4a2b; border-color: #2c6e40; color: #b7eec6; }
   #run:hover { background: #235934; }
+  #board { background: #1d2b4a; border-color: #2c4a6e; color: #b7d4ee; }
+  #board:hover { background: #233a59; }
   a.repo { color: #7a86ff; font-size: 13px; text-decoration: none; }
   main { flex: 1; display: flex; min-height: 0; }
   .left { flex: 1.2; display: flex; flex-direction: column; min-width: 0; border-right: 1px solid #262a34; }
@@ -58,6 +60,7 @@
   <button id="run" disabled>&#9654; Run</button>
   <button id="stop" disabled>&#9632; Stop</button>
   <button id="reset" disabled>&#x27F2; Reset</button>
+  <button id="board" disabled title="drive a real Arcade Coder over Web Bluetooth (Chrome/Edge)">&#9889; Run on board</button>
   <span id="status">loading Python…</span>
   <div class="spacer"></div>
   <a class="repo" href="https://github.com/hansstam86/arcade-coder-games">github repo &nearr;</a>
@@ -79,6 +82,7 @@
 const FILES = [
   "py/arcadecoder/__init__.py",
   "py/arcadecoder/runner.py",
+  "py/arcadecoder/protocol.py",
   "py/arcade.py",
   "py/minesweeper.py",
   "py/whackamole.py",
@@ -127,9 +131,46 @@ _captured = {}
 def _capture_run(cls, backend=None):
     _captured['cls'] = cls
 arcadecoder.run = _capture_run
+
+from arcadecoder import protocol as _proto
+import json as _json
+_board_frames = []
+_board_last = None
+
+def _board_start_hex():
+    return _proto.cmd_start_builtin('paint').hex()
+
+def _board_frame_hex():
+    global _board_last
+    fb = _loop.frame_device_bytes()
+    if fb == _board_last:
+        return ''
+    _board_last = fb
+    _board_frames.append(fb)
+    del _board_frames[:-4]
+    return _proto.cmd_paint_frame(fb).hex()
+
+def _board_presses(h):
+    canvas = _proto.extract_canvas(bytes.fromhex(h))
+    if canvas is None:
+        return '[]'
+    best = None
+    for fb in reversed(_board_frames):
+        changed = [i for i in range(144) if canvas[i*3:i*3+3] != fb[i*3:i*3+3]]
+        if best is None or len(changed) < len(best):
+            best = changed
+    if not best or len(best) > 4:
+        return '[]'
+    return _json.dumps([i for i in best if canvas[i*3:i*3+3] == _proto.BRUSH])
+
+def _board_reset_last():
+    global _board_last
+    _board_last = None
 `);
   statusEl.textContent = "ready — pick an example or write a game, then Run";
   runBtn.disabled = false;
+  if ("bluetooth" in navigator) boardBtn.disabled = false;
+  else boardBtn.title = "Web Bluetooth needs Chrome or Edge";
   const ex = await (await fetch("py/examples/chase.py")).text();
   editor.setValue(ex);
 }
@@ -150,19 +191,28 @@ function stop() {
   if (timer) clearInterval(timer);
   timer = null; running = false;
   stopBtn.disabled = resetBtn.disabled = true;
+  try { if (bleDevice && bleDevice.gatt.connected) bleDevice.gatt.disconnect(); } catch (e) {}
+  bleDevice = null; cmdChar = null;
   statusEl.textContent = "stopped";
+}
+
+function prepare() {
+  pyodide.runPython("_captured.clear()");
+  pyodide.globals.set("__name__", "__main__");
+  pyodide.runPython(editor.getValue());
+  if (!pyodide.runPython("'cls' in _captured")) {
+    say("your game never called run(YourGame) — add it at the end", true);
+    return false;
+  }
+  pyodide.runPython("from arcadecoder.runner import GameLoop\n_loop = GameLoop(_captured['cls'])\n_board_reset_last()");
+  return true;
 }
 
 runBtn.addEventListener("click", () => {
   stop();
   consoleEl.textContent = "";
   try {
-    pyodide.runPython("_captured.clear()");
-    pyodide.globals.set("__name__", "__main__");
-    pyodide.runPython(editor.getValue());
-    const has = pyodide.runPython("'cls' in _captured");
-    if (!has) { say("your game never called run(YourGame) — add it at the end", true); return; }
-    pyodide.runPython("from arcadecoder.runner import GameLoop\n_loop = GameLoop(_captured['cls'])");
+    if (!prepare()) return;
     const fps = pyodide.runPython("getattr(_captured['cls'], 'fps', 10)");
     running = true;
     stopBtn.disabled = resetBtn.disabled = false;
@@ -175,9 +225,73 @@ runBtn.addEventListener("click", () => {
     }, Math.max(40, 1000 / fps));
   } catch (e) { say(String(e), true); }
 });
+
+// ---- Web Bluetooth: drive a real board from the page -----------------------
+const boardBtn = document.getElementById("board");
+let bleDevice = null, cmdChar = null, boardBusy = false;
+const hexToBytes = (h) => Uint8Array.from(h.match(/../g) || [], (b) => parseInt(b, 16));
+
+async function connectBoard() {
+  const SERVICE = "778d5426-fa29-4363-91fd-a9f5cfcfce85";
+  const CMD = "e18d056b-7dae-49c1-b5f2-17684801e446";
+  const CB = "21acb4a0-24d0-42f4-8e61-c827daf68d12";
+  bleDevice = await navigator.bluetooth.requestDevice({
+    filters: [{ services: [SERVICE] }, { namePrefix: "Gamer" }],
+    optionalServices: [SERVICE],
+  });
+  bleDevice.addEventListener("gattserverdisconnected", () => { say("board disconnected", true); stop(); });
+  const server = await bleDevice.gatt.connect();
+  const svc = await server.getPrimaryService(SERVICE);
+  cmdChar = await svc.getCharacteristic(CMD);
+  const cbChar = await svc.getCharacteristic(CB);
+  await cbChar.startNotifications();
+  cbChar.addEventListener("characteristicvaluechanged", (e) => {
+    const dv = e.target.value;
+    let h = "";
+    for (let i = 0; i < dv.byteLength; i++) h += dv.getUint8(i).toString(16).padStart(2, "0");
+    try {
+      const hits = JSON.parse(pyodide.runPython(`_board_presses('${h}')`));
+      if (hits.length) {
+        for (const i of hits) pyodide.runPython(`_loop.press(${i % 12}, ${Math.floor(i / 12)})`);
+        pyodide.runPython("_board_reset_last()");  // repaint over the brush pixel
+      }
+    } catch (err) { say(String(err), true); }
+  });
+  await cmdChar.writeValueWithResponse(hexToBytes(pyodide.runPython("_board_start_hex()")));
+  await new Promise((r) => setTimeout(r, 800));
+}
+
+boardBtn.addEventListener("click", async () => {
+  stop();
+  consoleEl.textContent = "";
+  try {
+    if (!prepare()) return;
+    statusEl.textContent = "connecting to board\u2026 (pick it in the chooser)";
+    await connectBoard();
+    running = true;
+    stopBtn.disabled = resetBtn.disabled = false;
+    statusEl.textContent = "running on board \u2014 physical pads are live";
+    timer = setInterval(async () => {
+      try {
+        const proxy = pyodide.runPython("_loop.tick()");
+        paint(proxy.toJs()); proxy.destroy();
+        if (boardBusy || !cmdChar) return;
+        const cmdHex = pyodide.runPython("_board_frame_hex()");
+        if (cmdHex) {
+          boardBusy = true;
+          try { await cmdChar.writeValueWithResponse(hexToBytes(cmdHex)); }
+          finally { boardBusy = false; }
+        }
+      } catch (e) { say(String(e), true); stop(); }
+    }, 220);  // pace writes: faster streams drop the ESP32 connection
+  } catch (e) {
+    say(String(e), true);
+    statusEl.textContent = "board connection failed";
+  }
+});
 stopBtn.addEventListener("click", stop);
 resetBtn.addEventListener("click", () => {
-  if (running) try { pyodide.runPython("_loop.reset()"); } catch (e) { say(String(e), true); }
+  if (running) try { pyodide.runPython("_loop.reset()\n_board_reset_last()"); } catch (e) { say(String(e), true); }
 });
 document.getElementById("examples").addEventListener("change", async (e) => {
   if (!e.target.value) return;

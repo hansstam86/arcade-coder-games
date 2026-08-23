@@ -5,7 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 mkdir -p docs/py/arcadecoder docs/py/examples
-cp arcadecoder/__init__.py arcadecoder/runner.py docs/py/arcadecoder/
+cp arcadecoder/__init__.py arcadecoder/runner.py arcadecoder/protocol.py docs/py/arcadecoder/
 cp arcade.py minesweeper.py whackamole.py docs/py/
 
 for f in chase snake; do
