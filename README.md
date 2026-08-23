@@ -4,6 +4,11 @@ Playable games for the [Tech Will Save Us Arcade Coder](https://github.com/padra
 (the 12×12 RGB LED button matrix), driven from a Mac over Bluetooth LE against
 the **unmodified stock firmware**. No disassembly, no reflashing, no UART.
 
+**▶ Try it now, no hardware needed: [Arcade Coder Studio](https://hansstam86.github.io/arcade-coder-games/)** —
+a web IDE with the emulator built in. Write Python games in the browser (real
+Python via Pyodide, the actual `arcadecoder` SDK), run them on the virtual
+board, then run the identical file on real hardware with `--hw`.
+
 Working games — all launchable from an on-board menu ([arcade.py](arcade.py)):
 
 - **Minesweeper** ([minesweeper.py](minesweeper.py)) — 12×12, 18 mines, colour-coded

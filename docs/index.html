@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arcade Coder Studio</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; height: 100vh; display: flex; flex-direction: column;
+    background: #14161c; color: #9aa3b2; font-family: system-ui, sans-serif;
+  }
+  header {
+    display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+    background: #1b1d24; border-bottom: 1px solid #262a34;
+  }
+  header h1 { font-size: 15px; font-weight: 600; color: #d5dae4; margin: 0 8px 0 0; }
+  header .spacer { flex: 1; }
+  button, select {
+    padding: 6px 14px; border: 1px solid #3a3f4c; border-radius: 8px;
+    background: #1d2027; color: #c6cdd9; font: 500 13px system-ui; cursor: pointer;
+  }
+  button:hover { background: #262b35; }
+  button:disabled { opacity: .4; cursor: default; }
+  #run { background: #1d4a2b; border-color: #2c6e40; color: #b7eec6; }
+  #run:hover { background: #235934; }
+  a.repo { color: #7a86ff; font-size: 13px; text-decoration: none; }
+  main { flex: 1; display: flex; min-height: 0; }
+  .left { flex: 1.2; display: flex; flex-direction: column; min-width: 0; border-right: 1px solid #262a34; }
+  .CodeMirror { flex: 1; height: auto; font-size: 13px; }
+  .right { flex: 1; display: flex; flex-direction: column; align-items: center; overflow: auto; padding: 18px; gap: 14px; }
+  .device { background: #e8e4dc; border-radius: 22px; padding: 20px 20px 30px; box-shadow: 0 14px 44px rgba(0,0,0,.5); }
+  .grid { display: grid; grid-template-columns: repeat(12, 26px); gap: 5px; background: #1b1d24; padding: 12px; border-radius: 12px; }
+  .pad { width: 26px; height: 26px; border: 0; border-radius: 6px; background: #000; cursor: pointer; transition: transform .05s; box-shadow: inset 0 0 4px rgba(0,0,0,.6); }
+  .pad:active { transform: scale(.85); }
+  .home { margin: 16px auto 0; width: 38px; height: 10px; border-radius: 5px; background: #c9c4ba; }
+  #console {
+    width: 100%; max-width: 460px; flex: 1; min-height: 90px; overflow: auto;
+    background: #101218; border: 1px solid #262a34; border-radius: 10px;
+    padding: 10px 12px; font: 12px ui-monospace, monospace; white-space: pre-wrap;
+  }
+  #console .err { color: #ff8080; }
+  #status { font-size: 12px; opacity: .75; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Arcade Coder Studio</h1>
+  <select id="examples">
+    <option value="">examples…</option>
+    <option value="chase.py">chase (minimal)</option>
+    <option value="snake.py">snake (real-time)</option>
+    <option value="full_arcade.py">full arcade (10 games)</option>
+  </select>
+  <button id="run" disabled>&#9654; Run</button>
+  <button id="stop" disabled>&#9632; Stop</button>
+  <button id="reset" disabled>&#x27F2; Reset</button>
+  <span id="status">loading Python…</span>
+  <div class="spacer"></div>
+  <a class="repo" href="https://github.com/hansstam86/arcade-coder-games">github repo &nearr;</a>
+</header>
+<main>
+  <div class="left"><textarea id="code"></textarea></div>
+  <div class="right">
+    <div class="device">
+      <div class="grid" id="grid"></div>
+      <div class="home"></div>
+    </div>
+    <div id="console"></div>
+  </div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script>
+const FILES = [
+  "py/arcadecoder/__init__.py",
+  "py/arcadecoder/runner.py",
+  "py/arcade.py",
+  "py/minesweeper.py",
+  "py/whackamole.py",
+];
+const grid = document.getElementById("grid");
+const pads = [];
+for (let y = 0; y < 12; y++) for (let x = 0; x < 12; x++) {
+  const b = document.createElement("button");
+  b.className = "pad";
+  b.addEventListener("click", () => press(x, y));
+  grid.appendChild(b); pads.push(b);
+}
+const consoleEl = document.getElementById("console");
+function say(text, err = false) {
+  const s = document.createElement("span");
+  if (err) s.className = "err";
+  s.textContent = text + "\n";
+  consoleEl.appendChild(s);
+  consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+const editor = CodeMirror.fromTextArea(document.getElementById("code"), {
+  mode: "python", theme: "material-darker", lineNumbers: true, indentUnit: 4,
+});
+const runBtn = document.getElementById("run");
+const stopBtn = document.getElementById("stop");
+const resetBtn = document.getElementById("reset");
+const statusEl = document.getElementById("status");
+
+let pyodide = null, timer = null, running = false;
+
+async function boot() {
+  pyodide = await loadPyodide();
+  pyodide.setStdout({ batched: (t) => say(t) });
+  pyodide.setStderr({ batched: (t) => say(t, true) });
+  for (const f of FILES) {
+    const text = await (await fetch(f)).text();
+    const path = "/" + f;
+    pyodide.FS.mkdirTree(path.slice(0, path.lastIndexOf("/")));
+    pyodide.FS.writeFile(path, text);
+  }
+  pyodide.runPython(`
+import sys
+sys.path.insert(0, '/py')
+import arcadecoder
+_captured = {}
+def _capture_run(cls, backend=None):
+    _captured['cls'] = cls
+arcadecoder.run = _capture_run
+`);
+  statusEl.textContent = "ready — pick an example or write a game, then Run";
+  runBtn.disabled = false;
+  const ex = await (await fetch("py/examples/chase.py")).text();
+  editor.setValue(ex);
+}
+
+function paint(hex) {
+  for (let i = 0; i < 144; i++) {
+    pads[i].style.background = hex[i];
+    pads[i].style.boxShadow = hex[i] === "#000000"
+      ? "inset 0 0 4px rgba(0,0,0,.6)" : `0 0 8px ${hex[i]}`;
+  }
+}
+
+function press(x, y) {
+  if (running) try { pyodide.runPython(`_loop.press(${x}, ${y})`); } catch (e) { say(String(e), true); }
+}
+
+function stop() {
+  if (timer) clearInterval(timer);
+  timer = null; running = false;
+  stopBtn.disabled = resetBtn.disabled = true;
+  statusEl.textContent = "stopped";
+}
+
+runBtn.addEventListener("click", () => {
+  stop();
+  consoleEl.textContent = "";
+  try {
+    pyodide.runPython("_captured.clear()");
+    pyodide.globals.set("__name__", "__main__");
+    pyodide.runPython(editor.getValue());
+    const has = pyodide.runPython("'cls' in _captured");
+    if (!has) { say("your game never called run(YourGame) — add it at the end", true); return; }
+    pyodide.runPython("from arcadecoder.runner import GameLoop\n_loop = GameLoop(_captured['cls'])");
+    const fps = pyodide.runPython("getattr(_captured['cls'], 'fps', 10)");
+    running = true;
+    stopBtn.disabled = resetBtn.disabled = false;
+    statusEl.textContent = "running — click pads to press them";
+    timer = setInterval(() => {
+      try {
+        const proxy = pyodide.runPython("_loop.tick()");
+        paint(proxy.toJs()); proxy.destroy();
+      } catch (e) { say(String(e), true); stop(); }
+    }, Math.max(40, 1000 / fps));
+  } catch (e) { say(String(e), true); }
+});
+stopBtn.addEventListener("click", stop);
+resetBtn.addEventListener("click", () => {
+  if (running) try { pyodide.runPython("_loop.reset()"); } catch (e) { say(String(e), true); }
+});
+document.getElementById("examples").addEventListener("change", async (e) => {
+  if (!e.target.value) return;
+  editor.setValue(await (await fetch("py/examples/" + e.target.value)).text());
+});
+boot().catch((e) => { statusEl.textContent = "failed to load"; say(String(e), true); });
+</script>
+</body>
+</html>
