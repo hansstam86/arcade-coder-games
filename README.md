@@ -126,6 +126,24 @@ no hardware at all:
 python examples/full_arcade.py
 ```
 
+## ArcadeDeck — a customizable Stream Deck
+
+[deck.py](deck.py) turns the board into a 12×12 macro pad. Everything is
+configured in [deck.json](deck.json): pages of buttons with position, size,
+colour, and an action — `shell` (any command), `open` (app/URL/file),
+`applescript`, or `page` (switch profile pages). Buttons flash white on press
+and green/red by exit code, and a button with a `status` check command polls
+it on an interval and colours itself by the result (the included mute button
+shows your real mute state).
+
+```bash
+python deck.py          # design your layout in the browser emulator
+echo deck_hw.py > launch_target.txt && open ArcadeMinesweeper.app   # real board
+```
+
+The example config: mute toggle (with live state), Music play/pause, volume
+up/down, screenshot-to-clipboard, display sleep, links, and an apps page.
+
 ## Setup (macOS)
 
 ```bash

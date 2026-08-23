@@ -1,0 +1,61 @@
+{
+  "start_page": "main",
+  "pages": {
+    "main": {
+      "buttons": [
+        {
+          "x": 0, "y": 0, "w": 3, "h": 3, "label": "mute toggle",
+          "color": [0, 180, 0],
+          "action": { "type": "shell", "command": "osascript -e 'set volume output muted not (output muted of (get volume settings))'" },
+          "status": { "command": "osascript -e 'output muted of (get volume settings)' | grep -q true", "interval": 2, "on_color": [220, 0, 0], "off_color": [0, 180, 0] }
+        },
+        {
+          "x": 4, "y": 0, "w": 3, "h": 3, "label": "play/pause",
+          "color": [200, 0, 180],
+          "action": { "type": "applescript", "script": "tell application \"Music\" to playpause" }
+        },
+        {
+          "x": 8, "y": 0, "w": 3, "h": 3, "label": "vol up",
+          "color": [220, 200, 0],
+          "action": { "type": "shell", "command": "osascript -e 'set volume output volume ((output volume of (get volume settings)) + 10)'" }
+        },
+        {
+          "x": 8, "y": 4, "w": 3, "h": 3, "label": "vol down",
+          "color": [110, 100, 0],
+          "action": { "type": "shell", "command": "osascript -e 'set volume output volume ((output volume of (get volume settings)) - 10)'" }
+        },
+        {
+          "x": 0, "y": 4, "w": 3, "h": 3, "label": "screenshot to clipboard",
+          "color": [0, 190, 190],
+          "action": { "type": "shell", "command": "screencapture -ic" }
+        },
+        {
+          "x": 4, "y": 4, "w": 3, "h": 3, "label": "arcade repo",
+          "color": [230, 230, 230],
+          "action": { "type": "open", "target": "https://github.com/hansstam86/arcade-coder-games" }
+        },
+        {
+          "x": 0, "y": 8, "w": 3, "h": 3, "label": "display sleep",
+          "color": [240, 90, 0],
+          "action": { "type": "shell", "command": "pmset displaysleepnow" }
+        },
+        {
+          "x": 8, "y": 8, "w": 3, "h": 3, "label": "apps page",
+          "color": [0, 60, 220],
+          "action": { "type": "page", "target": "apps" }
+        }
+      ]
+    },
+    "apps": {
+      "buttons": [
+        { "x": 0, "y": 0, "w": 3, "h": 3, "label": "Safari",   "color": [0, 120, 255],  "action": { "type": "open", "target": "/Applications/Safari.app" } },
+        { "x": 4, "y": 0, "w": 3, "h": 3, "label": "Mail",     "color": [0, 190, 190],  "action": { "type": "open", "target": "/System/Applications/Mail.app" } },
+        { "x": 8, "y": 0, "w": 3, "h": 3, "label": "Calendar", "color": [220, 0, 0],    "action": { "type": "open", "target": "/System/Applications/Calendar.app" } },
+        { "x": 0, "y": 4, "w": 3, "h": 3, "label": "Notes",    "color": [220, 200, 0],  "action": { "type": "open", "target": "/System/Applications/Notes.app" } },
+        { "x": 4, "y": 4, "w": 3, "h": 3, "label": "Music",    "color": [255, 60, 120], "action": { "type": "open", "target": "/System/Applications/Music.app" } },
+        { "x": 8, "y": 4, "w": 3, "h": 3, "label": "Terminal", "color": [120, 120, 120],"action": { "type": "open", "target": "/System/Applications/Utilities/Terminal.app" } },
+        { "x": 8, "y": 8, "w": 3, "h": 3, "label": "back",     "color": [0, 60, 220],   "action": { "type": "page", "target": "main" } }
+      ]
+    }
+  }
+}
