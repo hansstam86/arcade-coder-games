@@ -112,6 +112,13 @@ swap, Huffman-only compression, write pacing, press decoding, and reconnects.
 See [examples/chase.py](examples/chase.py) (minimal) and
 [examples/snake.py](examples/snake.py) (real-time).
 
+The **entire 10-game arcade also runs in the emulator** — try every game with
+no hardware at all:
+
+```bash
+python examples/full_arcade.py
+```
+
 ## Setup (macOS)
 
 ```bash
