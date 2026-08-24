@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""Party mode — the board dances to live audio.
+"""Party mode — the board is a live spectrum analyzer / equalizer.
 
-Captures audio (the EP-133's USB audio stream by default — it's a USB audio
-interface! — or any input matching `device_contains` in party.json) and
-renders a 12-band log-spaced spectrum analyzer: colour gradient columns,
-white peak-hold dots, and a bass-driven background pulse. Auto-gain keeps it
-lively at any volume.
+Two audio sources (party.json "source"):
+  "system" (default): whatever the Mac is playing — Spotify, YouTube, the
+      EP-133 through speakers — captured digitally via ScreenCaptureKit
+      (sysaudio_helper, built from sysaudio.swift; needs the Screen Recording
+      permission for the app bundle). No microphone, no loopback drivers.
+  "input": an audio input device (the EP-133's USB audio stream by default,
+      or anything matching `device_contains`).
+
+If the system source can't start (permission missing), party mode falls back
+to the input source and keeps retrying system every 10s.
 
   python party.py             # emulator
   (on the board: it's an ArcadeOS app)
@@ -14,7 +19,7 @@ lively at any volume.
 from __future__ import annotations
 
 import json
-import math
+import subprocess
 import sys
 import threading
 import time
@@ -23,9 +28,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from arcadecoder import Game, run
 
-CONFIG_PATH = Path(__file__).resolve().parent / "party.json"
+ROOT = Path(__file__).resolve().parent
+CONFIG_PATH = ROOT / "party.json"
+HELPER = ROOT / "sysaudio_helper"
 
 DEFAULT = {
+    "source": "system",
     "device_contains": ["USBAudio", "EP-133", "mic"],
     "bands_hz": [60, 5000],        # log-spaced range across the 12 columns
     "gain_decay": 0.995,           # auto-gain: rolling max decay per frame
@@ -60,23 +68,77 @@ class Party(Game):
                 self.cfg.update(json.loads(CONFIG_PATH.read_text()))
             except Exception:
                 pass
-        self.levels = [0.0] * 12       # current column heights (rows)
-        self.peaks = [0.0] * 12        # peak-hold positions
+        self.levels = [0.0] * 12
+        self.peaks = [0.0] * 12
         self.peak_t = [0.0] * 12
-        self.gain = 1e-6               # rolling max for auto-gain
+        self.gain = 1e-6
         self.bass = 0.0
-        self.stream = None
+        self.stream = None            # sounddevice input stream
+        self.helper = None            # sysaudio subprocess
+        self.active_source = None     # "system" | "input" | None
         self.status = "starting audio…"
         self.buf = None
         self.lock = threading.Lock()
         self.next_try = 0.0
-        self._open_stream()
+        import numpy as np
+
+        self._np = np
+        self._open_audio()
 
     @property
     def busy(self):
-        return any(v > 0.5 for v in self.levels)   # music playing = don't idle away
+        return any(v > 0.5 for v in self.levels)
 
-    # -- audio ----------------------------------------------------------------
+    # -- system-audio source ---------------------------------------------------
+    def _open_system(self) -> bool:
+        if not HELPER.exists():
+            self.status = "sysaudio_helper missing (run: swiftc -O sysaudio.swift -o sysaudio_helper)"
+            return False
+        try:
+            self.helper = subprocess.Popen([str(HELPER)], stdout=subprocess.PIPE,
+                                           stderr=subprocess.PIPE)
+        except OSError as exc:
+            self.status = f"helper failed to launch: {exc}"
+            return False
+        threading.Thread(target=self._read_helper, daemon=True).start()
+        threading.Thread(target=self._read_helper_err, daemon=True).start()
+        self.active_source = "system"
+        self.status = "system audio (starting…)"
+        return True
+
+    def _read_helper(self) -> None:
+        proc = self.helper
+        np = self._np
+        pending = b""
+        want = BLOCK * 4
+        while proc and proc.poll() is None:
+            chunk = proc.stdout.read(want - len(pending))
+            if not chunk:
+                break
+            pending += chunk
+            if len(pending) >= want:
+                samples = np.frombuffer(pending[:want], dtype=np.float32)
+                pending = pending[want:]
+                with self.lock:
+                    self.buf = samples
+        if self.active_source == "system":
+            self.active_source = None
+            self.status = "system audio stopped — grant Screen Recording to the app, retrying"
+            log(f"party: {self.status}")
+
+    def _read_helper_err(self) -> None:
+        proc = self.helper
+        while proc and proc.poll() is None:
+            line = proc.stderr.readline()
+            if not line:
+                break
+            text = line.decode(errors="replace").strip()
+            if text:
+                log(f"party/sysaudio: {text}")
+                if "capturing" in text:
+                    self.status = "system audio"
+
+    # -- input-device source -----------------------------------------------------
     def _pick_device(self):
         import sounddevice as sd
 
@@ -90,20 +152,14 @@ class Party(Game):
                 return i, d["name"]
         return None, None
 
-    def _open_stream(self):
-        now = time.monotonic()
-        if self.stream is not None or now < self.next_try:
-            return
-        self.next_try = now + 5.0
+    def _open_input(self) -> bool:
         try:
-            import numpy as np
             import sounddevice as sd
 
             idx, name = self._pick_device()
             if idx is None:
                 self.status = "no audio input found"
-                return
-            self._np = np
+                return False
 
             def callback(indata, frames, t, status):
                 mono = indata.mean(axis=1) if indata.ndim > 1 else indata[:, 0]
@@ -114,12 +170,31 @@ class Party(Game):
                                          samplerate=SAMPLE_RATE, blocksize=BLOCK,
                                          callback=callback)
             self.stream.start()
+            self.active_source = "input"
             self.status = f"listening: {name}"
             log(f"party: {self.status}")
+            return True
         except Exception as exc:  # noqa: BLE001
             self.status = f"audio unavailable: {type(exc).__name__}"
-            log(f"party: {self.status} ({exc})")
             self.stream = None
+            return False
+
+    # -- source management ---------------------------------------------------
+    def _open_audio(self) -> None:
+        now = time.monotonic()
+        if self.active_source is not None or now < self.next_try:
+            return
+        self.next_try = now + 10.0
+        if self.cfg["source"] == "system":
+            if self.helper is not None and self.helper.poll() is None:
+                try:
+                    self.helper.kill()
+                except Exception:
+                    pass
+            if self._open_system():
+                return
+            log("party: system source unavailable, falling back to input")
+        self._open_input()
 
     def stop(self):
         if self.stream is not None:
@@ -128,6 +203,13 @@ class Party(Game):
             except Exception:
                 pass
             self.stream = None
+        if self.helper is not None:
+            try:
+                self.helper.kill()
+            except Exception:
+                pass
+            self.helper = None
+        self.active_source = None
 
     # -- analysis ---------------------------------------------------------------
     def _analyze(self, samples) -> list[float]:
@@ -144,7 +226,10 @@ class Party(Game):
         return bands
 
     def update(self, dt):
-        self._open_stream()
+        # if the system helper died (e.g. no permission yet), fall back / retry
+        if self.active_source == "system" and self.helper and self.helper.poll() is not None:
+            self.active_source = None
+        self._open_audio()
         with self.lock:
             samples, self.buf = self.buf, None
         if samples is None:
@@ -179,7 +264,7 @@ class Party(Game):
             pk = int(round(self.peaks[col]))
             if pk >= 1:
                 screen.set(col, max(0, 12 - pk), (230, 230, 230))
-        if self.stream is None and int(time.monotonic() * 2) % 2:
+        if self.active_source is None and int(time.monotonic() * 2) % 2:
             for x, y in ((0, 0), (11, 0)):
                 screen.set(x, y, (120, 0, 0))
 

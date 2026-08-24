@@ -146,9 +146,11 @@ scripts/install_login.sh    # optional: start ArcadeOS at login
 
 [party.py](party.py): a 12-band spectrum analyzer with peak-hold dots, a
 gradient from green to red, a bass-driven background pulse, and auto-gain.
-By default it captures the **EP-133's own USB audio stream** (it's a USB
-audio interface), falling back to any input device; configure matching in
-`party.json`. Runs as an ArcadeOS app (rainbow icon, bottom-right).
+By default it captures the Mac's **system audio** — anything playing, from
+Spotify to the EP-133 through speakers — digitally via ScreenCaptureKit
+(`sysaudio.swift` helper; grant the bundle Screen Recording). Falls back to
+an audio input device (the EP-133's USB audio stream) when unavailable;
+`party.json` picks source and device. Runs as an ArcadeOS app (rainbow icon).
 
 ## Notifications — see them on the board, hear them on the EP-133
 
