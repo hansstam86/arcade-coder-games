@@ -42,15 +42,19 @@ def _pack_pixels(indices: list[int], nbits: int) -> bytes:
     return bytes(out)
 
 
-def encode_image(pixels: list[tuple[int, int, int]]) -> bytes:
-    """pixels: 256 (r,g,b) row-major top-left first. Returns the framed bytes."""
+def encode_image(pixels: list[tuple[int, int, int]], max_colors: int = 256) -> bytes:
+    """pixels: 256 (r,g,b) row-major top-left first. Returns the framed bytes.
+    Palette is capped at max_colors (extra colours snap to the nearest) so the
+    BLE message stays small enough to arrive intact."""
     assert len(pixels) == N
+    cap = max(2, min(256, max_colors))
     palette: list[tuple[int, int, int]] = []
     index: dict[tuple[int, int, int], int] = {}
     for p in pixels:
         if p not in index:
-            if len(palette) >= 256:
-                p = min(palette, key=lambda q: sum((a - b) ** 2 for a, b in zip(p, q)))
+            if len(palette) >= cap:
+                index[p] = min(range(len(palette)),
+                               key=lambda k: sum((a - b) ** 2 for a, b in zip(p, palette[k])))
             else:
                 index[p] = len(palette)
                 palette.append(p)
@@ -95,8 +99,8 @@ class Pixoo:
             await self.client.write_gatt_char(WRITE_CHAR, data[i:i + 20], response=False)
             await asyncio.sleep(0.01)
 
-    async def image(self, pixels):
-        await self._write(encode_image(pixels))
+    async def image(self, pixels, max_colors: int = 256):
+        await self._write(encode_image(pixels, max_colors))
 
     async def fill(self, rgb):
         await self.image([tuple(rgb)] * N)

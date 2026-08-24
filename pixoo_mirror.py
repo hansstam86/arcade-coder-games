@@ -38,7 +38,7 @@ def quantize(pixels, levels=6):
 
 
 class PixooMirror:
-    def __init__(self, brightness=80, fps=4, quant_levels=6) -> None:
+    def __init__(self, brightness=80, fps=4, quant_levels=4, max_colors=16) -> None:
         self._frame = None
         self._lock = threading.Lock()
         self._stop = False
@@ -46,6 +46,7 @@ class PixooMirror:
         self.brightness = brightness
         self.min_interval = 1.0 / max(1, fps)
         self.quant_levels = quant_levels
+        self.max_colors = max_colors     # keep the BLE image small enough to arrive
         threading.Thread(target=self._run, daemon=True).start()
 
     def set_board_frame(self, px12) -> None:
@@ -76,7 +77,7 @@ class PixooMirror:
                         frame = self._frame
                     if frame is not None and frame != last:
                         try:
-                            await px.image(frame)
+                            await px.image(frame, max_colors=self.max_colors)
                             last = frame
                         except Exception:
                             break
