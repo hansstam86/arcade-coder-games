@@ -1,1 +1,1 @@
-{"idle_minutes": 0, "corner_taps": 3, "corner_window": 1.5}
+{"idle_minutes": 0, "corner_taps": 3, "corner_window": 1.5, "sound_activated": true, "sound_threshold": 0.006, "silence_seconds": 6.0}

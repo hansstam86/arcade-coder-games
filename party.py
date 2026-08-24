@@ -250,12 +250,18 @@ class Party(Game):
         return bands
 
     def update(self, dt):
-        # if the system helper died (e.g. no permission yet), fall back / retry
-        if self.active_source == "system" and self.helper and self.helper.poll() is not None:
-            self.active_source = None
-        self._open_audio()
-        with self.lock:
-            samples, self.buf = self.buf, None
+        bus = getattr(self, "audio_bus", None)
+        if bus is not None:
+            # ArcadeOS owns a shared capture; consume from it, no own helper
+            self.active_source = bus.active_source
+            samples = bus.get_block()
+        else:
+            # standalone: manage our own capture
+            if self.active_source == "system" and self.helper and self.helper.poll() is not None:
+                self.active_source = None
+            self._open_audio()
+            with self.lock:
+                samples, self.buf = self.buf, None
         if samples is None:
             for i in range(12):
                 self.levels[i] = max(0.0, self.levels[i] - self.cfg["fall_rows_per_frame"])

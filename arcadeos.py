@@ -37,7 +37,9 @@ from party import Party
 
 CONFIG_PATH = Path(__file__).resolve().parent / "arcadeos.json"
 
-DEFAULT = {"idle_minutes": 10, "corner_taps": 3, "corner_window": 1.5}
+DEFAULT = {"idle_minutes": 10, "corner_taps": 3, "corner_window": 1.5,
+           # sound-activated equalizer: play audio -> party; quiet -> ambient
+           "sound_activated": False, "sound_threshold": 0.006, "silence_seconds": 6.0}
 
 APPS = [
     # (name, class, icon quad colours [tl, tr, bl, br], position)
@@ -73,6 +75,17 @@ class ArcadeOS(Game):
         self.last_press = time.monotonic()
         self.corner_taps: list[float] = []
         self.pending_switch: str | None = None
+        self.sound_auto = False           # True while party was auto-opened by sound
+        self.last_sound = 0.0
+        self.bus = None
+        if self.cfg.get("sound_activated"):
+            try:
+                from audiobus import AudioBus
+
+                self.bus = AudioBus()
+                log("sound-activated: shared audio bus started")
+            except Exception as exc:  # noqa: BLE001
+                log(f"audio bus failed: {exc!r}")
         try:
             from arcadeos_web import ensure_server, set_os
 
@@ -88,6 +101,8 @@ class ArcadeOS(Game):
         except Exception as exc:  # noqa: BLE001
             log(f"notification service not started: {exc!r}")
         log("ArcadeOS home — press an icon: " + " ".join(n for n, *_ in APPS))
+        if self.bus is not None:            # sound-activated: rest in ambient
+            self.enter("ambient")
 
     # -- app switching -------------------------------------------------------
     def enter(self, name: str) -> None:
@@ -102,6 +117,8 @@ class ArcadeOS(Game):
             return
         self._cleanup()
         self.app = cls()
+        if name == "party" and self.bus is not None:
+            self.app.audio_bus = self.bus     # share the one capture
         self.app.start()
         self.app_name = name
         log(f"entered {name}")
@@ -168,6 +185,26 @@ class ArcadeOS(Game):
             self.auto_ambient_from = self.app_name
             self.enter("ambient")
             log(f"idle — ambient (press to return to {self.auto_ambient_from})")
+        self._sound_supervise(now)
+
+    def _sound_supervise(self, now: float) -> None:
+        """Sound-activated equalizer: audio playing -> party, quiet -> ambient.
+        Only toggles between ambient and an auto-opened party; leaves the user
+        alone in any other app or a manually-opened party."""
+        if self.bus is None or not self.cfg.get("sound_activated"):
+            return
+        loud = self.bus.level > self.cfg["sound_threshold"]
+        if loud:
+            self.last_sound = now
+        if self.app_name in ("ambient", "home") and loud:
+            self.enter("party")
+            self.sound_auto = True
+            log(f"sound detected (level {self.bus.level:.3f}) — equalizer")
+        elif (self.app_name == "party" and self.sound_auto
+              and now - self.last_sound > self.cfg["silence_seconds"]):
+            self.enter("ambient")
+            self.sound_auto = False
+            log("quiet — back to ambient")
 
     def draw(self, screen):
         if self.app is not None:
