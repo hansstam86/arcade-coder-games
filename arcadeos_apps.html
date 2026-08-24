@@ -96,13 +96,20 @@ const statusEl = document.getElementById('status');
 let drag = null;     // {from:'slot',index} | {from:'drawer',name}
 
 async function load() {
-  const r = await fetch('/apps');
-  const d = await r.json();
-  COLS = d.cols; ROWS = d.rows;
-  SLOTS = d.slots.slice();
-  REGISTRY = {};
-  d.registry.forEach(a => REGISTRY[a.name] = a);
-  render();
+  try {
+    const r = await fetch('/apps', {cache: 'no-store'});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    COLS = d.cols; ROWS = d.rows;
+    SLOTS = d.slots.slice();
+    REGISTRY = {};
+    d.registry.forEach(a => REGISTRY[a.name] = a);
+    render();
+  } catch (e) {
+    grid.innerHTML = '<div style="grid-column:1/-1;color:#7b8494;text-align:center;padding:20px">' +
+      'Waiting for the board… (retrying)</div>';
+    setTimeout(load, 2000);      // self-heal if the board was restarting
+  }
 }
 
 function iconEl(name) {
