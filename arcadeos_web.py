@@ -58,6 +58,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, PAGE_APPS.read_bytes(), "text/html; charset=utf-8")
         elif self.path == "/apps":
             from arcadeos import REGISTRY, load_layout_names
+            from app_info import info_for
 
             def hexes(icon):
                 return ["#%02x%02x%02x" % tuple(c) for c in icon]
@@ -65,7 +66,7 @@ class Handler(BaseHTTPRequestHandler):
             body = {
                 "cols": 3, "rows": 5,
                 "slots": load_layout_names(),
-                "registry": [{"name": n, "icon": hexes(icon)}
+                "registry": [{"name": n, "icon": hexes(icon), **info_for(n)}
                              for n, (_nm, _cls, icon) in REGISTRY.items()],
                 "current": _os.app_name if _os else None,
             }

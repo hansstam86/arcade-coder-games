@@ -45,6 +45,16 @@
   .status { font-size: 13px; color: #6ee7a0; margin-left: auto; opacity: 0; transition: opacity .2s; }
   .status.show { opacity: 1; }
   .tip { color: #7b8494; font-size: 12.5px; margin: 10px 2px 0; }
+  .chip.sel { outline: 2px solid #4f8cff; outline-offset: 1px; }
+  .info .head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .info .icon { width: 34px; height: 34px; }
+  .info .title { font-size: 17px; font-weight: 600; }
+  .info .desc { color: #b9c1cf; margin: 0 0 12px; }
+  .info ul { margin: 0; padding-left: 18px; color: #cfd6e2; }
+  .info li { margin: 5px 0; }
+  .info .placeholder { color: #5a6474; }
+  .globals { color: #7b8494; font-size: 12.5px; border-top: 1px solid #232a37; margin-top: 14px; padding-top: 12px; }
+  .globals b { color: #aeb7c6; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -61,6 +71,11 @@
     <h2>Available apps</h2>
     <div class="drawer" id="drawer"></div>
     <p class="tip">The grid order is the order the on-board ‹ › app-cycle pads follow. Drop one app on another to swap them.</p>
+  </div>
+
+  <div class="panel info" id="info">
+    <h2>App guide</h2>
+    <p class="placeholder">Click any app above to see what it does and how to use it.</p>
   </div>
 
   <div class="bar">
@@ -111,8 +126,27 @@ function chip(name, source) {
     drag = source; e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', name);
   });
+  c.addEventListener('click', () => showInfo(name));
   return c;
 }
+
+let selected = null;
+function showInfo(name) {
+  selected = name;
+  document.querySelectorAll('.chip').forEach(el =>
+    el.classList.toggle('sel', el.querySelector('.name') &&
+      el.querySelector('.name').textContent === name));
+  const a = REGISTRY[name] || {};
+  const use = (a.use || []).map(u => `<li>${esc(u)}</li>`).join('');
+  document.getElementById('info').innerHTML = `
+    <h2>App guide</h2>
+    <div class="head">${iconEl(name).outerHTML}<div class="title">${esc(name)}</div></div>
+    <p class="desc">${esc(a.desc || '')}</p>
+    <ul>${use}</ul>
+    <div class="globals"><b>On every screen:</b> ‹ › top corners cycle apps ·
+      bottom row is volume − / mute / volume +.</div>`;
+}
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 function render() {
   grid.innerHTML = '';
@@ -134,6 +168,9 @@ function render() {
     e.textContent = 'All apps are placed.'; drawer.appendChild(e);
   }
   avail.forEach(n => drawer.appendChild(chip(n, {from:'drawer', name:n})));
+  if (selected) document.querySelectorAll('.chip').forEach(el =>
+    el.classList.toggle('sel', el.querySelector('.name') &&
+      el.querySelector('.name').textContent === selected));
 }
 
 function dropOnSlot(i) {

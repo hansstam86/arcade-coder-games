@@ -1,0 +1,118 @@
+"""Short description + quick usage guide for each ArcadeOS app.
+
+Surfaced in the web App Organizer (click an app to see how it works). Keep each
+`desc` to one line and `use` to a few short, board-accurate bullets.
+"""
+
+APP_INFO = {
+    "games": {
+        "desc": "Ten classic mini-games in one launcher.",
+        "use": [
+            "Tap a game tile to start playing.",
+            "Play with the pads — controls vary per game.",
+            "Includes minesweeper, tetris, snake, simon, connect four and more.",
+        ],
+    },
+    "deck": {
+        "desc": "A customizable macro pad (Stream Deck).",
+        "use": [
+            "Press a button to run its Mac action — launch an app, hotkey, or shortcut.",
+            "Design your own layout in the editor at 127.0.0.1:7788.",
+        ],
+    },
+    "kopads": {
+        "desc": "Play pads for the Teenage Engineering EP-133.",
+        "use": [
+            "Tap pads to trigger EP-133 sounds over MIDI.",
+            "Configure the pad mapping in the editor at 127.0.0.1:7799.",
+        ],
+    },
+    "seq": {
+        "desc": "A step sequencer for drum patterns.",
+        "use": [
+            "Tap grid cells to toggle steps in the pattern.",
+            "It loops and plays through the EP-133; patterns are saved to seq.json.",
+        ],
+    },
+    "midiviz": {
+        "desc": "A live visualizer for the MIDI you play.",
+        "use": [
+            "Play the EP-133 (or any MIDI) and watch the board react.",
+            "No controls — it's a display.",
+        ],
+    },
+    "rhythm": {
+        "desc": "A beat-matching rhythm game.",
+        "use": [
+            "Hit the pads in time with the marked targets.",
+            "Your score climbs the closer you land to the beat.",
+        ],
+    },
+    "ambient": {
+        "desc": "A calm idle display — a live clock.",
+        "use": [
+            "Shows the time and gently dims at night.",
+            "This is the default idle screen when nothing else is running.",
+        ],
+    },
+    "party": {
+        "desc": "A 12-band audio equalizer light show.",
+        "use": [
+            "Reacts to whatever audio your Mac is playing.",
+            "Opens automatically when sound starts and returns to idle when it's quiet.",
+        ],
+    },
+    "marquee": {
+        "desc": "Scrolls any text across the board.",
+        "use": [
+            "Set the message from the dashboard at 127.0.0.1:7770.",
+            "Also used to flash incoming notifications.",
+        ],
+    },
+    "pomodoro": {
+        "desc": "A Pomodoro focus / break timer.",
+        "use": [
+            "Press anywhere to start or pause.",
+            "Amber pad (top-right) cycles presets: 25/5, 50/10, 15/3, 90/20.",
+            "Blue pad (bottom-left) resets; white pad (bottom-right) skips the interval.",
+            "The ring counts down and the board flashes between work and breaks.",
+        ],
+    },
+    "countdown": {
+        "desc": "A countdown timer you set on the board.",
+        "use": [
+            "Set the time: red − / green + for minutes (outer) and seconds (inner).",
+            "Press the green START in the middle to begin.",
+            "Running: centre = pause, top-left = stop, top-right = +1 min, bottom-left = restart.",
+            "At zero it flashes red and sounds an alarm — press to stop it.",
+        ],
+    },
+    "weather": {
+        "desc": "Animated local weather and forecast.",
+        "use": [
+            "Shows current conditions as an animated scene plus the temperature.",
+            "The bottom row is a 12-hour forecast ribbon (blue = cold, red = hot).",
+            "Tap to toggle temperature / feels-like. Set your location in weather.json.",
+        ],
+    },
+    "onair": {
+        "desc": "An on-air busy light driven by your mic.",
+        "use": [
+            "Turns red ON AIR when your microphone is in use, green when free.",
+            "Tap to cycle mode: AUTO (follow the mic) / force-ON / force-OFF.",
+            "The marker on the left edge shows the current mode.",
+        ],
+    },
+    "ytmusic": {
+        "desc": "A remote for YouTube Music (and other players).",
+        "use": [
+            "Transport: ⏮ previous · ⏯ play-pause · ⏭ next — works even in the background.",
+            "The bars up top react to the music.",
+            "Use the bottom-row volume − / mute / volume + pads.",
+        ],
+    },
+}
+
+
+def info_for(name: str) -> dict:
+    return APP_INFO.get(name, {"desc": "", "use": []})
