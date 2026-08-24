@@ -33,6 +33,11 @@ NC_DB = Path.home() / "Library/Group Containers/group.com.apple.usernoted/db2/db
 PORT_CONTAINS = ["EP-133", "EP133", "K.O", "KO II"]
 
 DEFAULT = {
+    # show EVERY notification on the board (scroll its text), not only matches
+    "show_all": True,
+    "default": {"color": [0, 150, 255], "style": "border", "note": 40,
+                "velocity": 100, "channel": 0, "duration": 2.5, "cooldown": 3,
+                "marquee": True},
     "rules": [
         {"name": "slack", "app_contains": "slack", "title_contains": "",
          "color": [240, 120, 0], "style": "border", "note": 39,
@@ -41,9 +46,27 @@ DEFAULT = {
         {"name": "mail", "app_contains": "mail", "title_contains": "",
          "color": [0, 90, 240], "style": "corner", "note": 37,
          "velocity": 100, "channel": 0, "duration": 2.0, "cooldown": 8,
-         "enabled": True},
+         "marquee": True, "enabled": True},
     ]
 }
+
+# friendly names for common macOS notification source bundle ids
+APP_NAMES = {
+    "slack": "SLACK", "mail": "MAIL", "messages": "MESSAGES", "imessage": "MESSAGES",
+    "calendar": "CALENDAR", "ical": "CALENDAR", "reminders": "REMINDERS", "whatsapp": "WHATSAPP",
+    "telegram": "TELEGRAM", "discord": "DISCORD", "zoom": "ZOOM", "teams": "TEAMS",
+    "outlook": "OUTLOOK", "spotify": "SPOTIFY", "music": "MUSIC", "facetime": "FACETIME",
+    "safari": "SAFARI", "chrome": "CHROME", "notes": "NOTES", "photos": "PHOTOS",
+}
+
+
+def friendly_app(app: str) -> str:
+    low = (app or "").lower()
+    for key, name in APP_NAMES.items():
+        if key in low:
+            return name
+    tail = low.replace("com.", "").split(".")[-1] or low
+    return tail.upper()[:12] if tail else "ALERT"
 
 
 def log(msg: str) -> None:
@@ -73,6 +96,16 @@ class NotifyService:
         threading.Thread(target=self._nc_poller, daemon=True).start()
 
     # -- rule engine ---------------------------------------------------------
+    def _do_marquee(self, prefix: str, title: str, body: str) -> None:
+        if self.on_marquee is None:
+            return
+        parts = [p.strip() for p in (title, body) if p and p.strip()]
+        text = prefix + ("  " + " ".join(parts) if parts else "")
+        try:
+            self.on_marquee(text)
+        except Exception:
+            pass
+
     def handle(self, app: str, title: str, body: str = "") -> str | None:
         now = time.monotonic()
         with self.lock:
@@ -90,18 +123,22 @@ class NotifyService:
                 return rule["name"]
             self.last_fired[rule["name"]] = now
             self.fire(rule)
-            if rule.get("marquee") and self.on_marquee is not None:
-                text = (title or "").strip()
-                if body:
-                    text += (": " if text else "") + body.strip()
-                if not text:
-                    text = rule["name"]
-                try:
-                    self.on_marquee(text)
-                except Exception:
-                    pass
+            if rule.get("marquee") or self.cfg.get("show_all", True):
+                self._do_marquee(friendly_app(app), title, body)
             log(f"notification: {app!r} -> rule '{rule['name']}'")
             return rule["name"]
+        # no rule matched: show it anyway (any and all notifications)
+        if self.cfg.get("show_all", True):
+            d = dict(self.cfg.get("default", DEFAULT["default"]))
+            if now - self.last_fired.get("__all__", -999) < d.get("cooldown", 3):
+                return "all(cooldown)"
+            self.last_fired["__all__"] = now
+            d["name"] = "all"
+            self.fire(d)
+            if d.get("marquee", True):
+                self._do_marquee(friendly_app(app), title, body)
+            log(f"notification: {app!r} -> show-all")
+            return "all"
         return None
 
     def fire(self, rule: dict) -> None:

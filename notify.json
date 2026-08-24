@@ -33,7 +33,23 @@
       "channel": 0,
       "duration": 2.0,
       "cooldown": 8,
-      "enabled": true
+      "enabled": true,
+      "marquee": true
     }
-  ]
+  ],
+  "show_all": true,
+  "default": {
+    "color": [
+      0,
+      150,
+      255
+    ],
+    "style": "border",
+    "note": 40,
+    "velocity": 100,
+    "channel": 0,
+    "duration": 2.5,
+    "cooldown": 3,
+    "marquee": true
+  }
 }
