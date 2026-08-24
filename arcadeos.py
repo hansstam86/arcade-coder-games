@@ -35,6 +35,7 @@ from rhythm import Rhythm
 from ambient import Ambient
 from party import Party
 from marquee import Marquee
+from pomodoro import Pomodoro
 import macapps
 import firefox
 
@@ -59,16 +60,17 @@ DEFAULT = {"idle_minutes": 10, "corner_taps": 3, "corner_window": 1.5,
            "firefox_tab_pads": True}
 
 APPS = [
-    # (name, class, icon quad colours [tl, tr, bl, br], position) — 3x3 grid
+    # (name, class, icon quad colours [tl, tr, bl, br], position) — 3 cols x 4 rows
     ("games", Arcade, [(0, 180, 0), (200, 0, 0), (200, 180, 0), (0, 60, 220)], (1, 1)),
     ("deck", Deck, [(230, 230, 230)] * 4, (5, 1)),
     ("kopads", KOPads, [(240, 90, 0), (220, 200, 0), (230, 230, 230), (200, 0, 60)], (9, 1)),
-    ("seq", Sequencer, [(0, 200, 0), (0, 200, 0), (2, 2, 10), (0, 200, 0)], (1, 5)),
-    ("midiviz", MidiViz, [(200, 0, 180), (0, 190, 190), (0, 190, 190), (200, 0, 180)], (5, 5)),
-    ("rhythm", Rhythm, [(200, 0, 60), (220, 200, 0), (220, 200, 0), (200, 0, 60)], (9, 5)),
-    ("ambient", Ambient, [(0, 40, 120), (0, 60, 160), (0, 60, 160), (0, 40, 120)], (1, 9)),
-    ("party", Party, [(0, 220, 0), (255, 220, 0), (255, 60, 0), (180, 0, 255)], (5, 9)),
-    ("marquee", Marquee, [(0, 200, 255), (0, 120, 255), (0, 120, 255), (0, 200, 255)], (9, 9)),
+    ("seq", Sequencer, [(0, 200, 0), (0, 200, 0), (2, 2, 10), (0, 200, 0)], (1, 4)),
+    ("midiviz", MidiViz, [(200, 0, 180), (0, 190, 190), (0, 190, 190), (200, 0, 180)], (5, 4)),
+    ("rhythm", Rhythm, [(200, 0, 60), (220, 200, 0), (220, 200, 0), (200, 0, 60)], (9, 4)),
+    ("ambient", Ambient, [(0, 40, 120), (0, 60, 160), (0, 60, 160), (0, 40, 120)], (1, 7)),
+    ("party", Party, [(0, 220, 0), (255, 220, 0), (255, 60, 0), (180, 0, 255)], (5, 7)),
+    ("marquee", Marquee, [(0, 200, 255), (0, 120, 255), (0, 120, 255), (0, 200, 255)], (9, 7)),
+    ("pomodoro", Pomodoro, [(255, 70, 40), (255, 70, 40), (0, 200, 90), (0, 200, 90)], (1, 10)),
 ]
 APP_BY_NAME = {name: cls for name, cls, _i, _p in APPS}
 
@@ -252,7 +254,7 @@ class ArcadeOS(Game):
             return
         if self.app_name == "home":
             for name, _cls, _icon, (bx, by) in APPS:
-                if bx - 1 <= x <= bx + 2 and by - 1 <= y <= by + 2:
+                if bx - 1 <= x <= bx + 2 and by - 1 <= y <= by + 1:
                     self.enter(name)
                     return
             return
