@@ -251,44 +251,16 @@ class NotifyService:
                 px = screen.px[i]
                 screen.px[i] = tuple(int(px[c] * (1 - a) + color[c] * a) for c in range(3))
 
-    # -- Notification Center reader (via the FDA-granted ncread_helper) -------
+    # -- Notification Center reader ------------------------------------------
+    # NCReader.app (a proper .app) reads the NC database and POSTs each
+    # notification to our /notify webhook. It must run as its own app (via
+    # `open`) so the Full Disk Access granted to NCReader.app applies to it.
     def _nc_poller(self) -> None:
-        helper = ROOT / "ncread_helper"
-        if not helper.exists():
-            self.nc_status = "ncread_helper missing (swiftc -O ncread.swift -o ncread_helper -lsqlite3)"
-            return
-        import subprocess
-
-        while True:
-            try:
-                proc = subprocess.Popen([str(helper)], stdout=subprocess.PIPE,
-                                        stderr=subprocess.PIPE)
-            except OSError as exc:
-                self.nc_status = f"helper failed to launch: {exc}"
-                time.sleep(5.0)
-                continue
-            # watch stderr for the access status
-            def watch_err(p=proc):
-                for line in iter(p.stderr.readline, b""):
-                    txt = line.decode(errors="replace").strip()
-                    if "watching" in txt:
-                        self.nc_status = "ok"
-                    elif "Full Disk Access" in txt or "denied" in txt:
-                        self.nc_status = ("no access — grant Full Disk Access to "
-                                          "ncread_helper in System Settings")
-            threading.Thread(target=watch_err, daemon=True).start()
-            for line in iter(proc.stdout.readline, b""):
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    obj = json.loads(line)
-                    self.nc_status = "ok"
-                    self.handle(obj.get("app", ""), obj.get("title", ""), obj.get("body", ""))
-                except Exception:
-                    pass
-            proc.wait()
-            time.sleep(3.0)     # helper exited (e.g. no FDA yet) — retry
+        # NCReader.app runs as a LaunchAgent (see scripts/install_ncreader.sh)
+        # and POSTs notifications to /notify and its state to /nc_status. The
+        # reader survives ArcadeOS restarts; nothing to launch here.
+        if self.nc_status in ("starting", None):
+            self.nc_status = "waiting for NCReader (grant it Full Disk Access)"
 
 
 SERVICE: NotifyService | None = None
@@ -356,6 +328,13 @@ class Handler(BaseHTTPRequestHandler):
             rule = svc.handle(str(body.get("app", "")), str(body.get("title", "")),
                               str(body.get("body", "")))
             self._send(200, json.dumps({"matched": rule}).encode(), "application/json")
+        elif self.path == "/nc_status":
+            if body.get("ok"):
+                svc.nc_status = "ok"
+            else:
+                svc.nc_status = ("no access — grant Full Disk Access to NCReader.app: "
+                                 + str(body.get("error", "")))
+            self._send(200, b"ok", "text/plain")
         elif self.path == "/test":
             idx = body.get("rule")
             rules = svc.cfg["rules"]

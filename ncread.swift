@@ -1,15 +1,24 @@
-// ncread — watch the macOS Notification Center database and print each new
-// notification as a JSON line on stdout. Grant THIS binary Full Disk Access
-// (System Settings > Privacy & Security > Full Disk Access > add ncread_helper).
-//
-//   swiftc -O ncread.swift -o ncread_helper -lsqlite3
-//   ./ncread_helper           # {"app":"...","title":"...","body":"..."} per line
+// ncread — watch the macOS Notification Center database and POST each new
+// notification to the ArcadeOS webhook. Runs as its OWN app (NCReader.app)
+// launched via LaunchServices, so Full Disk Access granted to NCReader.app
+// applies to it. Grant FDA to NCReader.app once.
 
 import Foundation
 import SQLite3
 
-func elog(_ s: String) {
-    FileHandle.standardError.write((s + "\n").data(using: .utf8)!)
+let WEBHOOK = "http://127.0.0.1:7760/notify"
+let STATUS = "http://127.0.0.1:7760/nc_status"
+
+func post(_ url: String, _ obj: [String: Any]) {
+    guard let u = URL(string: url),
+          let body = try? JSONSerialization.data(withJSONObject: obj) else { return }
+    var req = URLRequest(url: u)
+    req.httpMethod = "POST"
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    req.httpBody = body
+    let sem = DispatchSemaphore(value: 0)
+    URLSession.shared.dataTask(with: req) { _, _, _ in sem.signal() }.resume()
+    _ = sem.wait(timeout: .now() + 2)
 }
 
 let home = FileManager.default.homeDirectoryForCurrentUser
@@ -18,13 +27,11 @@ let dbPath = home.appendingPathComponent(
 
 var db: OpaquePointer?
 if sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY, nil) != SQLITE_OK {
-    elog("cannot open NC DB — grant Full Disk Access to ncread_helper: "
-         + String(cString: sqlite3_errmsg(db)))
+    post(STATUS, ["ok": false, "error": String(cString: sqlite3_errmsg(db))])
     exit(2)
 }
-elog("ncread: watching Notification Center DB")
+post(STATUS, ["ok": true])
 
-// Cocoa reference epoch; start from "now" so we only emit fresh notifications.
 var lastDelivered = Date().timeIntervalSinceReferenceDate
 let query = """
     SELECT a.identifier, r.delivered_date, r.data
@@ -32,15 +39,7 @@ let query = """
     WHERE r.delivered_date > ? ORDER BY r.delivered_date
     """
 
-func emit(_ app: String, _ title: String, _ body: String) {
-    let obj: [String: Any] = ["app": app, "title": title, "body": body]
-    if let jd = try? JSONSerialization.data(withJSONObject: obj),
-       var js = String(data: jd, encoding: .utf8) {
-        js += "\n"
-        FileHandle.standardOutput.write(js.data(using: .utf8)!)
-    }
-}
-
+var lastPing = Date()
 while true {
     var stmt: OpaquePointer?
     if sqlite3_prepare_v2(db, query, -1, &stmt, nil) == SQLITE_OK {
@@ -60,9 +59,13 @@ while true {
                     body = (req["body"] as? String) ?? ""
                 }
             }
-            emit(ident, title, body)
+            post(WEBHOOK, ["app": ident, "title": title, "body": body])
         }
     }
     sqlite3_finalize(stmt)
+    // periodic keepalive so the service knows access is still good
+    if Date().timeIntervalSince(lastPing) > 20 {
+        post(STATUS, ["ok": true]); lastPing = Date()
+    }
     Thread.sleep(forTimeInterval: 1.5)
 }
