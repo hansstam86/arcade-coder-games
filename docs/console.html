@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arcade Coder — Fantasy Console</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; height:100vh; display:flex; flex-direction:column;
+    background:#12141a; color:#9aa3b2; font-family:system-ui,sans-serif; }
+  header { display:flex; align-items:center; gap:8px; padding:9px 14px;
+    background:#1b1d24; border-bottom:1px solid #262a34; flex-wrap:wrap; }
+  header h1 { font-size:14px; font-weight:700; color:#ffd166; margin:0 6px 0 0; letter-spacing:.3px; }
+  input.cart { background:#12141a; border:1px solid #3a3f4c; border-radius:7px;
+    color:#d5dae4; padding:5px 9px; font:500 13px system-ui; width:130px; }
+  button, select { padding:6px 11px; border:1px solid #3a3f4c; border-radius:7px;
+    background:#1d2027; color:#c6cdd9; font:500 12.5px system-ui; cursor:pointer; }
+  button:hover { background:#262b35; }
+  button:disabled { opacity:.4; cursor:default; }
+  #run { background:#1d4a2b; border-color:#2c6e40; color:#b7eec6; }
+  #board { background:#1d2b4a; border-color:#2c4a6e; color:#b7d4ee; }
+  header .spacer { flex:1; }
+  a.repo { color:#7a86ff; font-size:12.5px; text-decoration:none; }
+  #status { font-size:12px; opacity:.75; margin-left:4px; }
+  main { flex:1; display:flex; min-height:0; }
+  .left { flex:1.15; display:flex; flex-direction:column; min-width:0; border-right:1px solid #262a34; }
+  .tabs { display:flex; gap:2px; background:#161920; padding:6px 8px 0; }
+  .tab { padding:7px 16px; border:1px solid #262a34; border-bottom:none;
+    border-radius:8px 8px 0 0; background:#171a21; color:#8b94a3; font-weight:600; font-size:12.5px; }
+  .tab.on { background:#12141a; color:#ffd166; }
+  .pane { flex:1; min-height:0; display:none; }
+  .pane.on { display:flex; flex-direction:column; }
+  .CodeMirror { flex:1; height:auto; font-size:13px; }
+  /* sprite editor */
+  #spritePane { padding:16px; gap:16px; overflow:auto; align-items:flex-start; }
+  .palette { display:grid; grid-template-columns:repeat(9,26px); gap:5px; }
+  .sw { width:26px; height:26px; border-radius:5px; border:2px solid transparent; cursor:pointer; }
+  .sw.on { border-color:#fff; }
+  .sw.trans { background:
+    linear-gradient(45deg,#333 25%,transparent 25%,transparent 75%,#333 75%),
+    linear-gradient(45deg,#333 25%,#222 25%,#222 75%,#333 75%);
+    background-size:10px 10px; background-position:0 0,5px 5px; }
+  .sped { display:grid; grid-template-columns:repeat(8,30px); grid-template-rows:repeat(8,30px);
+    gap:2px; background:#0c0e13; padding:8px; border-radius:10px; touch-action:none; }
+  .sc { width:30px; height:30px; border-radius:3px; }
+  .sc.t { background:
+    linear-gradient(45deg,#26292f 25%,transparent 25%,transparent 75%,#26292f 75%),
+    linear-gradient(45deg,#26292f 25%,#1a1c22 25%,#1a1c22 75%,#26292f 75%);
+    background-size:14px 14px; background-position:0 0,7px 7px; }
+  .bank { display:grid; grid-template-columns:repeat(8,34px); gap:5px; }
+  .bcell { width:34px; height:34px; border-radius:6px; background:#0c0e13; border:2px solid #262a34;
+    cursor:pointer; display:grid; grid-template-columns:repeat(8,1fr); grid-template-rows:repeat(8,1fr); overflow:hidden; }
+  .bcell.on { border-color:#ffd166; }
+  .bcell span { display:block; }
+  .col { display:flex; flex-direction:column; gap:8px; }
+  .col h3 { font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:#6b7280; margin:0; }
+  .right { flex:1; display:flex; flex-direction:column; align-items:center; overflow:auto; padding:18px; gap:14px; }
+  .device { background:#e8e4dc; border-radius:20px; padding:18px 18px 26px; box-shadow:0 14px 40px rgba(0,0,0,.5); }
+  .grid { display:grid; grid-template-columns:repeat(12,24px); gap:4px; background:#1b1d24; padding:11px; border-radius:11px; }
+  .pad { width:24px; height:24px; border:0; border-radius:5px; background:#000; cursor:pointer; box-shadow:inset 0 0 4px rgba(0,0,0,.6); }
+  .pad:active { transform:scale(.85); }
+  .home { margin:14px auto 0; width:34px; height:9px; border-radius:5px; background:#c9c4ba; }
+  #console { width:100%; max-width:440px; flex:1; min-height:80px; overflow:auto;
+    background:#0e1016; border:1px solid #262a34; border-radius:10px; padding:9px 11px;
+    font:12px ui-monospace,monospace; white-space:pre-wrap; }
+  #console .err { color:#ff8080; }
+  .hint { font-size:11.5px; color:#5a6474; max-width:180px; line-height:1.5; }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#127918; FANTASY CONSOLE</h1>
+  <input class="cart" id="cartName" value="untitled" title="cartridge name">
+  <button id="new">New</button>
+  <button id="save">Save</button>
+  <select id="load"><option value="">Load…</option></select>
+  <button id="export">Export</button>
+  <button id="import">Import</button>
+  <input type="file" id="file" accept=".json" style="display:none">
+  <span style="width:1px;height:20px;background:#333;margin:0 4px"></span>
+  <button id="run" disabled>&#9654; Run</button>
+  <button id="stop" disabled>&#9632;</button>
+  <button id="board" disabled title="drive a real board over Web Bluetooth (Chrome/Edge)">&#9889; Board</button>
+  <span id="status">loading Python…</span>
+  <span class="spacer"></span>
+  <a class="repo" href="index.html">&larr; studio</a>
+</header>
+<main>
+  <div class="left">
+    <div class="tabs">
+      <div class="tab on" data-t="code">CODE</div>
+      <div class="tab" data-t="sprite">SPRITE</div>
+    </div>
+    <div class="pane on" id="codePane"><textarea id="code"></textarea></div>
+    <div class="pane" id="spritePane">
+      <div class="col">
+        <h3>Sprite <span id="sprNum">0</span></h3>
+        <div class="sped" id="sped"></div>
+        <div class="palette" id="palette"></div>
+      </div>
+      <div class="col">
+        <h3>Bank</h3>
+        <div class="bank" id="bank"></div>
+        <p class="hint">Click a slot to edit it. Use <code>spr(n, x, y)</code> in code to stamp sprite <b>n</b> with its top-left at (x, y). The checkerboard color is transparent.</p>
+      </div>
+    </div>
+  </div>
+  <div class="right">
+    <div class="device"><div class="grid" id="grid"></div><div class="home"></div></div>
+    <div id="console"></div>
+  </div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script>
+// ---- PICO-8 palette (16 colours) -----------------------------------------
+const PAL = ["#000000","#1d2b53","#7e2553","#008751","#ab5236","#5f574f","#c2c3c7","#fff1e8",
+             "#ff004d","#ffa300","#ffec27","#00e436","#29adff","#83769c","#ff77a8","#ffccaa"];
+const SPR_N = 16, SPR_SZ = 8;
+let sprites = Array.from({length:SPR_N}, () => Array.from({length:SPR_SZ}, () => Array(SPR_SZ).fill(null)));
+let curSpr = 0, curColor = 8;
+
+const DEFAULT_CODE = `# Arcade Coder — Fantasy Console
+# _init() runs once, _update() every frame, _draw() renders the 12x12 screen.
+# API: cls(c) pset(x,y,c) pget(x,y) spr(n,x,y) btnp() t() rnd(n) flr() mid()
+# Colours are 0..15 (PICO-8 palette). Draw sprites in the SPRITE tab.
+
+FPS = 20
+
+def _init():
+    global px, py
+    px, py = 4, 4          # sprite 0 is 8x8; keep it on-screen
+
+def _update():
+    global px, py
+    p = btnp()             # (x, y) of a pad tapped this frame, or None
+    if p:
+        px = mid(0, p[0] - 4, 4)
+        py = mid(0, p[1] - 4, 4)
+
+def _draw():
+    cls(1)                 # clear to dark blue
+    spr(0, px, py)         # stamp sprite 0
+    c = 8 if (t() * 2) % 2 < 1 else 10
+    pset(0, 0, c)          # blinking corner pixel
+`;
+
+// ---- the Python preamble that turns the mini-API into a real SDK Game -----
+const PREAMBLE = `
+import time as _time, random as _random, math as _math
+from arcadecoder import Game, run
+PAL = [(0,0,0),(29,43,83),(126,37,83),(0,135,81),(171,82,54),(95,87,79),(194,195,199),(255,241,232),(255,0,77),(255,163,0),(255,236,39),(0,228,54),(41,173,255),(131,118,156),(255,119,168),(255,204,170)]
+W = H = 12
+_scr = [[0]*W for _ in range(H)]
+_pressed = []
+_t0 = 0.0
+def cls(c=0):
+    for _y in range(H):
+        _r = _scr[_y]
+        for _x in range(W): _r[_x] = int(c) % 16
+def pset(x,y,c):
+    x=int(x); y=int(y)
+    if c is not None and 0<=x<W and 0<=y<H: _scr[y][x] = int(c) % 16
+def pget(x,y):
+    x=int(x); y=int(y)
+    return _scr[y][x] if 0<=x<W and 0<=y<H else 0
+def spr(n,x,y):
+    n=int(n); x=int(x); y=int(y)
+    if 0<=n<len(SPRITES):
+        for _j,_row in enumerate(SPRITES[n]):
+            for _i,_c in enumerate(_row):
+                if _c is not None: pset(x+_i, y+_j, _c)
+def btnp(bx=None,by=None):
+    if bx is None: return _pressed[0] if _pressed else None
+    return (int(bx),int(by)) in _pressed
+def btns(): return list(_pressed)
+def t(): return _time.monotonic() - _t0
+def rnd(n=1.0): return _random.random()*n
+def flr(v): return int(_math.floor(v))
+def mid(a,b,c): return sorted((a,b,c))[1]
+def sgn(v): return -1 if v<0 else (1 if v>0 else 0)
+class _PicoGame(Game):
+    fps = 15
+    def start(self):
+        global _t0
+        _t0 = _time.monotonic()
+        if '_init' in globals(): _init()
+    def update(self, dt):
+        if '_update' in globals(): _update()
+    def on_press(self, x, y):
+        _pressed.append((int(x),int(y)))
+    def draw(self, screen):
+        if '_draw' in globals(): _draw()
+        for _y in range(H):
+            for _x in range(W):
+                screen.set(_x, _y, PAL[_scr[_y][_x] % 16])
+        _pressed.clear()
+`;
+const POSTAMBLE = `
+_PicoGame.fps = int(globals().get('FPS', 15))
+run(_PicoGame)
+`;
+
+// ---- board preview + console ---------------------------------------------
+const grid = document.getElementById("grid"), pads = [];
+for (let y=0;y<12;y++) for (let x=0;x<12;x++){
+  const b=document.createElement("button"); b.className="pad";
+  b.addEventListener("click",()=>press(x,y)); grid.appendChild(b); pads.push(b);
+}
+const consoleEl=document.getElementById("console");
+function say(t,err=false){ const s=document.createElement("span"); if(err)s.className="err";
+  s.textContent=t+"\n"; consoleEl.appendChild(s); consoleEl.scrollTop=consoleEl.scrollHeight; }
+function paint(hex){ for(let i=0;i<144;i++){ pads[i].style.background=hex[i];
+  pads[i].style.boxShadow=hex[i]==="#000000"?"inset 0 0 4px rgba(0,0,0,.6)":`0 0 7px ${hex[i]}`; } }
+
+// ---- tabs ----------------------------------------------------------------
+document.querySelectorAll(".tab").forEach(tab=>tab.addEventListener("click",()=>{
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t===tab));
+  document.getElementById("codePane").classList.toggle("on",tab.dataset.t==="code");
+  document.getElementById("spritePane").classList.toggle("on",tab.dataset.t==="sprite");
+  if(tab.dataset.t==="code") editor.refresh();
+}));
+
+// ---- sprite editor -------------------------------------------------------
+const paletteEl=document.getElementById("palette");
+const eraser=document.createElement("div"); eraser.className="sw trans"; eraser.title="transparent";
+eraser.addEventListener("click",()=>setColor(null)); paletteEl.appendChild(eraser);
+PAL.forEach((c,i)=>{ const s=document.createElement("div"); s.className="sw"; s.style.background=c;
+  s.dataset.i=i; s.addEventListener("click",()=>setColor(i)); paletteEl.appendChild(s); });
+function setColor(i){ curColor=i;
+  document.querySelectorAll(".palette .sw").forEach(s=>s.classList.remove("on"));
+  if(i===null) eraser.classList.add("on");
+  else paletteEl.querySelector(`.sw[data-i="${i}"]`).classList.add("on"); }
+const spedEl=document.getElementById("sped"), scells=[];
+let painting=false;
+for(let i=0;i<SPR_SZ*SPR_SZ;i++){ const c=document.createElement("div"); c.className="sc t";
+  const x=i%SPR_SZ, y=(i/SPR_SZ)|0;
+  const put=()=>{ sprites[curSpr][y][x]=curColor; drawCell(c,curColor); drawBankCell(curSpr); };
+  c.addEventListener("mousedown",()=>{painting=true;put();});
+  c.addEventListener("mouseenter",()=>{if(painting)put();});
+  spedEl.appendChild(c); scells.push(c); }
+window.addEventListener("mouseup",()=>painting=false);
+function drawCell(el,ci){ if(ci===null){ el.className="sc t"; el.style.background=""; }
+  else { el.className="sc"; el.style.background=PAL[ci]; } }
+function renderSprite(){ document.getElementById("sprNum").textContent=curSpr;
+  for(let i=0;i<scells.length;i++){ const x=i%SPR_SZ,y=(i/SPR_SZ)|0; drawCell(scells[i],sprites[curSpr][y][x]); } }
+const bankEl=document.getElementById("bank"), bcells=[];
+for(let n=0;n<SPR_N;n++){ const b=document.createElement("div"); b.className="bcell"+(n===0?" on":"");
+  for(let i=0;i<64;i++){ const s=document.createElement("span"); b.appendChild(s); }
+  b.addEventListener("click",()=>{ curSpr=n; bcells.forEach(x=>x.classList.remove("on"));
+    b.classList.add("on"); renderSprite(); }); bankEl.appendChild(b); bcells.push(b); }
+function drawBankCell(n){ const spans=bcells[n].children;
+  for(let i=0;i<64;i++){ const x=i%8,y=(i/8)|0,ci=sprites[n][y][x];
+    spans[i].style.background=ci===null?"#0c0e13":PAL[ci]; } }
+function renderAllBank(){ for(let n=0;n<SPR_N;n++) drawBankCell(n); }
+setColor(8);
+
+// ---- cartridges (localStorage + file) ------------------------------------
+const CART_KEY="arcade_carts";
+function carts(){ try{return JSON.parse(localStorage.getItem(CART_KEY))||{};}catch(e){return {};} }
+function refreshLoad(){ const sel=document.getElementById("load"); sel.innerHTML='<option value="">Load…</option>';
+  Object.keys(carts()).forEach(n=>{ const o=document.createElement("option"); o.value=o.textContent=n; sel.appendChild(o); }); }
+function currentCart(){ return {name:document.getElementById("cartName").value||"untitled",
+  code:editor.getValue(), sprites:sprites}; }
+function applyCart(c){ document.getElementById("cartName").value=c.name||"untitled";
+  editor.setValue(c.code||DEFAULT_CODE);
+  sprites=(c.sprites&&c.sprites.length===SPR_N)?c.sprites:sprites.map(s=>s.map(r=>r.map(()=>null)));
+  curSpr=0; bcells.forEach((b,i)=>b.classList.toggle("on",i===0)); renderSprite(); renderAllBank(); }
+document.getElementById("save").addEventListener("click",()=>{ const all=carts(); const c=currentCart();
+  all[c.name]=c; localStorage.setItem(CART_KEY,JSON.stringify(all)); refreshLoad(); say(`saved cart "${c.name}"`); });
+document.getElementById("load").addEventListener("change",e=>{ const c=carts()[e.target.value];
+  if(c){ applyCart(c); say(`loaded "${c.name}"`);} e.target.value=""; });
+document.getElementById("new").addEventListener("click",()=>{
+  applyCart({name:"untitled",code:DEFAULT_CODE,sprites:null}); say("new cart"); });
+document.getElementById("export").addEventListener("click",()=>{ const c=currentCart();
+  const blob=new Blob([JSON.stringify(c,null,1)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=c.name+".cart.json"; a.click(); });
+document.getElementById("import").addEventListener("click",()=>document.getElementById("file").click());
+document.getElementById("file").addEventListener("change",e=>{ const f=e.target.files[0]; if(!f)return;
+  const r=new FileReader(); r.onload=()=>{ try{ applyCart(JSON.parse(r.result)); say("imported "+f.name);}
+    catch(err){ say("bad cart file",true);} }; r.readAsText(f); e.target.value=""; });
+
+// ---- Pyodide engine (shared with the studio) -----------------------------
+const FILES=["py/arcadecoder/__init__.py","py/arcadecoder/runner.py","py/arcadecoder/protocol.py"];
+const editor=CodeMirror.fromTextArea(document.getElementById("code"),
+  {mode:"python",theme:"material-darker",lineNumbers:true,indentUnit:4});
+editor.setValue(DEFAULT_CODE);
+const runBtn=document.getElementById("run"),stopBtn=document.getElementById("stop"),
+      boardBtn=document.getElementById("board"),statusEl=document.getElementById("status");
+let pyodide=null,timer=null,running=false;
+
+async function boot(){
+  pyodide=await loadPyodide();
+  pyodide.setStdout({batched:t=>say(t)}); pyodide.setStderr({batched:t=>say(t,true)});
+  for(const f of FILES){ const text=await(await fetch(f)).text(); const path="/"+f;
+    pyodide.FS.mkdirTree(path.slice(0,path.lastIndexOf("/"))); pyodide.FS.writeFile(path,text); }
+  pyodide.runPython(`
+import sys
+sys.path.insert(0,'/py')
+import arcadecoder
+_captured={}
+def _capture_run(cls,backend=None): _captured['cls']=cls
+arcadecoder.run=_capture_run
+from arcadecoder import protocol as _proto
+import json as _json
+_board_frames=[]; _board_last=None
+def _board_start_hex(): return _proto.cmd_start_builtin('paint').hex()
+def _board_frame_hex():
+    global _board_last
+    fb=_loop.frame_device_bytes()
+    if fb==_board_last: return ''
+    _board_last=fb; _board_frames.append(fb); del _board_frames[:-4]
+    return _proto.cmd_paint_frame(fb).hex()
+def _board_presses(h):
+    canvas=_proto.extract_canvas(bytes.fromhex(h))
+    if canvas is None: return '[]'
+    best=None
+    for fb in reversed(_board_frames):
+        changed=[i for i in range(144) if canvas[i*3:i*3+3]!=fb[i*3:i*3+3]]
+        if best is None or len(changed)<len(best): best=changed
+    if not best or len(best)>4: return '[]'
+    return _json.dumps([i for i in best if canvas[i*3:i*3+3]==_proto.BRUSH])
+def _board_reset_last():
+    global _board_last; _board_last=None
+`);
+  statusEl.textContent="ready — write, draw sprites, Run";
+  runBtn.disabled=false;
+  if("bluetooth" in navigator) boardBtn.disabled=false;
+  else boardBtn.title="Web Bluetooth needs Chrome or Edge";
+}
+
+function assemble(){
+  const sprJson=JSON.stringify(sprites);
+  return "import json as _cartjson\nSPRITES=_cartjson.loads(r'''"+sprJson+"''')\n"+PREAMBLE+"\n"+editor.getValue()+"\n"+POSTAMBLE;
+}
+function prepare(){
+  pyodide.runPython("_captured.clear()");
+  pyodide.globals.set("__name__","__main__");
+  pyodide.runPython(assemble());
+  if(!pyodide.runPython("'cls' in _captured")){ say("engine error: run() was not reached",true); return false; }
+  pyodide.runPython("from arcadecoder.runner import GameLoop\n_loop=GameLoop(_captured['cls'])\n_board_reset_last()");
+  return true;
+}
+function press(x,y){ if(running) try{pyodide.runPython(`_loop.press(${x}, ${y})`);}catch(e){say(String(e),true);} }
+function stop(){ if(timer)clearInterval(timer); timer=null; running=false; stopBtn.disabled=true;
+  try{ if(bleDevice&&bleDevice.gatt.connected) bleDevice.gatt.disconnect(); }catch(e){}
+  bleDevice=null; cmdChar=null; statusEl.textContent="stopped"; }
+
+runBtn.addEventListener("click",()=>{ stop(); consoleEl.textContent="";
+  try{ if(!prepare())return;
+    const fps=pyodide.runPython("getattr(_captured['cls'],'fps',15)");
+    running=true; stopBtn.disabled=false; statusEl.textContent="running — tap pads to play";
+    timer=setInterval(()=>{ try{ const p=pyodide.runPython("_loop.tick()"); paint(p.toJs()); p.destroy(); }
+      catch(e){ say(String(e),true); stop(); } }, Math.max(33,1000/fps));
+  }catch(e){ say(String(e),true); } });
+stopBtn.addEventListener("click",stop);
+
+// ---- Web Bluetooth board (same protocol as the studio) -------------------
+let bleDevice=null,cmdChar=null,boardBusy=false;
+const hexToBytes=h=>Uint8Array.from(h.match(/../g)||[],b=>parseInt(b,16));
+async function connectBoard(){
+  const S="778d5426-fa29-4363-91fd-a9f5cfcfce85",C="e18d056b-7dae-49c1-b5f2-17684801e446",
+        B="21acb4a0-24d0-42f4-8e61-c827daf68d12";
+  bleDevice=await navigator.bluetooth.requestDevice({filters:[{services:[S]},{namePrefix:"Gamer"}],optionalServices:[S]});
+  bleDevice.addEventListener("gattserverdisconnected",()=>{say("board disconnected",true);stop();});
+  const srv=await(await bleDevice.gatt.connect()).getPrimaryService(S);
+  cmdChar=await srv.getCharacteristic(C);
+  const cb=await srv.getCharacteristic(B); await cb.startNotifications();
+  cb.addEventListener("characteristicvaluechanged",e=>{ const dv=e.target.value; let h="";
+    for(let i=0;i<dv.byteLength;i++) h+=dv.getUint8(i).toString(16).padStart(2,"0");
+    try{ const hits=JSON.parse(pyodide.runPython(`_board_presses('${h}')`));
+      if(hits.length){ for(const i of hits) pyodide.runPython(`_loop.press(${i%12}, ${Math.floor(i/12)})`);
+        pyodide.runPython("_board_reset_last()"); } }catch(err){say(String(err),true);} });
+  await cmdChar.writeValueWithResponse(hexToBytes(pyodide.runPython("_board_start_hex()")));
+  await new Promise(r=>setTimeout(r,800));
+}
+boardBtn.addEventListener("click",async()=>{ stop(); consoleEl.textContent="";
+  try{ if(!prepare())return; statusEl.textContent="connecting to board… (pick it in the chooser)";
+    await connectBoard(); running=true; stopBtn.disabled=false;
+    statusEl.textContent="running on the board — physical pads are live";
+    timer=setInterval(async()=>{ try{ const p=pyodide.runPython("_loop.tick()"); paint(p.toJs()); p.destroy();
+      if(boardBusy||!cmdChar)return; const cmd=pyodide.runPython("_board_frame_hex()");
+      if(cmd){ boardBusy=true; try{ await cmdChar.writeValueWithResponse(hexToBytes(cmd)); }finally{ boardBusy=false; } }
+    }catch(e){ say(String(e),true); stop(); } },220);
+  }catch(e){ say(String(e),true); statusEl.textContent="board connection failed"; } });
+
+renderSprite(); renderAllBank(); refreshLoad();
+boot().catch(e=>{ statusEl.textContent="failed to load"; say(String(e),true); });
+</script>
+</body>
+</html>
