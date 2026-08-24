@@ -39,7 +39,7 @@ DEFAULT = {
     "gain_decay": 0.995,           # auto-gain: rolling max decay per frame
     "fall_rows_per_frame": 0.55,   # how fast columns fall
     "palette": "rainbow",          # "rainbow" (animated per-band hue) or "heat"
-    "rainbow_speed": 0.15,         # hue rotations per second
+    "rainbow_speed": 0.22,         # hue rotations per second
 }
 
 SAMPLE_RATE = 48000
@@ -95,6 +95,8 @@ class Party(Game):
         self.peak_t = [0.0] * 12
         self.gain = 1e-6
         self.bass = 0.0
+        self.prev_bass = 0.0
+        self.flash = 0.0              # beat-strobe intensity, decays each frame
         self.stream = None            # sounddevice input stream
         self.helper = None            # sysaudio subprocess
         self.active_source = None     # "system" | "input" | None
@@ -273,7 +275,11 @@ class Party(Game):
                 self.peak_t[i] = now
             elif now - self.peak_t[i] > 0.6:
                 self.peaks[i] = max(0.0, self.peaks[i] - 0.35)
+        self.prev_bass = self.bass
         self.bass = 0.75 * self.bass + 0.25 * min(1.0, (bands[0] + bands[1]) / (2 * self.gain))
+        # kick onset: a sharp rise in bass energy triggers a strobe flash
+        if self.bass - self.prev_bass > 0.16 and self.bass > 0.45:
+            self.flash = 1.0
 
     def draw(self, screen):
         now = time.monotonic()
@@ -296,6 +302,12 @@ class Party(Game):
             pk = int(round(self.peaks[col]))
             if pk >= 1:
                 screen.set(col, max(0, 12 - pk), (255, 255, 255))
+        # beat strobe: flash the whole board white on kicks, then decay
+        if self.flash > 0.01:
+            f = self.flash
+            screen.px = [tuple(min(255, int(v + (255 - v) * f)) for v in px)
+                         for px in screen.px]
+            self.flash *= 0.55
         if self.active_source is None and int(time.monotonic() * 2) % 2:
             for x, y in ((0, 0), (11, 0)):
                 screen.set(x, y, (120, 0, 0))
