@@ -1,20 +1,26 @@
 #!/usr/bin/env python3
 """Countdown timer — set the time on the board, then let it run down.
 
-Two modes. In SET mode four corner buttons adjust the target time and a green
-button in the middle starts it; in RUN mode the time ticks down and the middle
-button pauses/resumes. At zero the board flashes red and an alarm sound repeats
-until you press to acknowledge.
+SET mode shows a big MM:SS (minutes on top, seconds below) with a control bar
+across the middle:
 
-Layout (interior corners, clear of the global edge pads):
-  SET:  top-left (-1 min)   top-right (+1 min)
-        bottom-left (-15 s) bottom-right (+15 s)
-        centre green 2x2 = START
-  RUN:  centre 2x2 = pause / resume,  top-left = stop (back to SET)
-  ALARM: press anywhere = acknowledge
+    [-min][-sec][ START ][+sec][+min]
+
+Green means add, red means subtract; the outer buttons step minutes, the inner
+ones step seconds (5 s). The number updates as you press, so what you see is
+what will run.
+
+RUN mode ticks the time down, with controls in the corners:
+    centre 2x2 ... pause / resume
+    top-left ..... stop (back to SET)
+    top-right .... +1 min (extend)
+    bottom-left .. restart from the top
+
+At zero the board flashes red and an alarm sound repeats until you press to
+acknowledge.
 
 Config in countdown.json (auto-created): target (last time in seconds),
-  step_sec (seconds button step), alarm_sound (aiff path or "").
+  sec_step (seconds button step), alarm_sound (aiff path or "").
 
   python countdown.py         # emulator
 """
@@ -22,6 +28,7 @@ Config in countdown.json (auto-created): target (last time in seconds),
 from __future__ import annotations
 
 import json
+import math
 import subprocess
 import sys
 import threading
@@ -36,7 +43,7 @@ MAX_SECONDS = 99 * 60 + 59
 
 DEFAULT = {
     "target": 5 * 60,
-    "step_sec": 15,
+    "sec_step": 5,
     "alarm_sound": "/System/Library/Sounds/Glass.aiff",
 }
 
@@ -53,16 +60,24 @@ FONT = {  # 3x5 digits
     "9": ["111", "101", "111", "001", "111"],
 }
 
-# buttons (interior corners) and the centre pad
-MIN_DOWN = (1, 1)
-MIN_UP = (10, 1)
-SEC_DOWN = (1, 10)
-SEC_UP = (10, 10)
-CENTER = {(5, 5), (6, 5), (5, 6), (6, 6)}
-STOP_BTN = (1, 1)   # in RUN mode, top-left stops back to SET
+MINUTE_POS = [(2, 0), (7, 0)]   # two digit blocks, top rows 0-4
+SECOND_POS = [(2, 7), (7, 7)]   # two digit blocks, bottom rows 7-11
+BAND = (5, 6)                   # control-bar rows
 
-MINUTE_POS = [(2, 0), (7, 0)]   # two digit blocks, top
-SECOND_POS = [(2, 7), (7, 7)]   # two digit blocks, bottom
+# SET control bar: (x-range, key) across the middle band
+SET_BAR = [
+    (range(0, 2),  "min-"),
+    (range(2, 4),  "sec-"),
+    (range(4, 8),  "start"),
+    (range(8, 10), "sec+"),
+    (range(10, 12), "min+"),
+]
+
+# RUN mode corner buttons
+RUN_STOP = (1, 1)       # back to SET
+RUN_EXTEND = (10, 1)    # +1 min
+RUN_RESTART = (1, 10)   # restart from target
+RUN_CENTER = {(5, 5), (6, 5), (5, 6), (6, 6)}
 
 
 def log(msg: str) -> None:
@@ -80,15 +95,15 @@ class Countdown(Game):
             except Exception:
                 pass
         self.target = max(0, min(MAX_SECONDS, int(self.cfg.get("target", 300))))
-        self.step = max(1, int(self.cfg.get("step_sec", 15)))
+        self.step = max(1, int(self.cfg.get("sec_step", 5)))
         self.mode = "set"           # set | run | alarm
         self.running = False
         self.remaining = float(self.target)
-        self.busy = False           # true while running/alarming
+        self.busy = False
         self.alarm_on = False
+        self.press_flash = {}       # button key -> monotonic expiry (tap feedback)
         self.last = time.monotonic()
-        log(f"countdown ready — {self.target // 60:02d}:{self.target % 60:02d}, "
-            "set the time and press the centre to start")
+        log(f"countdown ready — {self.target // 60:02d}:{self.target % 60:02d}")
 
     # -- setting -------------------------------------------------------------
     def _adjust(self, delta: int) -> None:
@@ -132,6 +147,13 @@ class Countdown(Game):
         self.running = False
         self.remaining = float(self.target)
 
+    def _begin_run(self) -> None:
+        self.mode = "run"
+        self.running = True
+        self.remaining = float(self.target)
+        self.last = time.monotonic()
+        log(f"countdown start — {self.target // 60:02d}:{self.target % 60:02d}")
+
     def stop(self) -> None:
         """Called by ArcadeOS when leaving the app — silence any alarm."""
         self._stop_alarm()
@@ -142,27 +164,33 @@ class Countdown(Game):
             self._to_set()
             return
         if self.mode == "run":
-            if (x, y) == STOP_BTN:
+            if (x, y) == RUN_STOP:
                 self._to_set()
-                return
-            if (x, y) in CENTER:
+            elif (x, y) == RUN_EXTEND:
+                self.remaining = min(MAX_SECONDS, self.remaining + 60)
+            elif (x, y) == RUN_RESTART:
+                self.remaining = float(self.target)
+                self.running = True
+                self.last = time.monotonic()
+            elif (x, y) in RUN_CENTER:
                 self.running = not self.running
             return
-        # set mode
-        if (x, y) == MIN_UP:
-            self._adjust(60)
-        elif (x, y) == MIN_DOWN:
-            self._adjust(-60)
-        elif (x, y) == SEC_UP:
-            self._adjust(self.step)
-        elif (x, y) == SEC_DOWN:
-            self._adjust(-self.step)
-        elif (x, y) in CENTER and self.target > 0:
-            self.mode = "run"
-            self.running = True
-            self.remaining = float(self.target)
-            self.last = time.monotonic()
-            log(f"countdown start — {self.target // 60:02d}:{self.target % 60:02d}")
+        # set mode: which bar button?
+        if y in BAND:
+            for xs, key in SET_BAR:
+                if x in xs:
+                    self.press_flash[key] = time.monotonic() + 0.15
+                    if key == "min+":
+                        self._adjust(60)
+                    elif key == "min-":
+                        self._adjust(-60)
+                    elif key == "sec+":
+                        self._adjust(self.step)
+                    elif key == "sec-":
+                        self._adjust(-self.step)
+                    elif key == "start" and self.target > 0:
+                        self._begin_run()
+                    return
 
     def update(self, dt):
         now = time.monotonic()
@@ -176,51 +204,60 @@ class Countdown(Game):
                 self._start_alarm()
 
     # -- render --------------------------------------------------------------
-    def _time_digits(self, screen, col) -> None:
-        secs = max(0, int(self.remaining + 0.99))
-        mm, ss = min(99, secs // 60), secs % 60
-        text = f"{mm:02d}{ss:02d}"
+    def _digits(self, screen, col, secs=None) -> None:
+        s = self.remaining if secs is None else secs
+        s = max(0, int(s + 0.99))
+        text = f"{min(99, s // 60):02d}{s % 60:02d}"
         for ch, (ox, oy) in zip(text, MINUTE_POS + SECOND_POS):
             for dy, row in enumerate(FONT[ch]):
                 for dx, bit in enumerate(row):
                     if bit == "1":
                         screen.set(ox + dx, oy + dy, col)
 
+    def _fill(self, screen, xs, rows, color) -> None:
+        for yy in rows:
+            for xx in xs:
+                screen.set(xx, yy, color)
+
     def draw(self, screen):
         now = time.monotonic()
         if self.mode == "alarm":
             on = int(now * 5) % 2 == 0
-            screen.clear((120, 0, 0) if on else (10, 0, 0))
+            screen.clear((130, 0, 0) if on else (12, 0, 0))
             if on:
-                self._time_digits(screen, (255, 255, 255))
+                self._digits(screen, (255, 255, 255))
             return
 
         screen.clear((0, 0, 0))
         if self.mode == "set":
-            col = (0, 200, 255)
-            self._time_digits(screen, col)
-            # adjust buttons
-            screen.set(*MIN_UP, (0, 200, 90))
-            screen.set(*MIN_DOWN, (200, 40, 40))
-            screen.set(*SEC_UP, (0, 140, 70))
-            screen.set(*SEC_DOWN, (150, 30, 30))
-            # start (green 2x2), pulsing, only when time > 0
-            if self.target > 0:
-                p = int(120 + 100 * (0.5 + 0.5 * __import__("math").sin(now * 3)))
-                for cx, cy in CENTER:
-                    screen.set(cx, cy, (0, p, 0))
+            self._digits(screen, (0, 200, 255))
+            # control bar
+            def lit(key, base):
+                if now < self.press_flash.get(key, 0):
+                    return (255, 255, 255)
+                return base
+            self._fill(screen, range(0, 2), BAND, lit("min-", (210, 30, 30)))
+            self._fill(screen, range(2, 4), BAND, lit("sec-", (150, 55, 20)))
+            self._fill(screen, range(8, 10), BAND, lit("sec+", (30, 140, 60)))
+            self._fill(screen, range(10, 12), BAND, lit("min+", (30, 210, 60)))
+            if self.target > 0:                       # pulsing START
+                p = int(120 + 100 * (0.5 + 0.5 * math.sin(now * 3)))
+                self._fill(screen, range(4, 8), BAND,
+                           (255, 255, 255) if now < self.press_flash.get("start", 0)
+                           else (0, p, 0))
+            else:
+                self._fill(screen, range(4, 8), BAND, (40, 40, 40))
         else:  # run
-            secs = self.remaining
-            base = (255, 60, 40) if secs <= 10 else (235, 235, 235)
+            base = (255, 60, 40) if self.remaining <= 10 else (235, 235, 235)
             col = base
             if not self.running and int(now * 2) % 2 == 0:      # blink when paused
                 col = tuple(c // 4 for c in base)
-            self._time_digits(screen, col)
-            # centre = pause/resume
-            cc = (255, 170, 0) if not self.running else (0, 120, 0)
-            for cx, cy in CENTER:
-                screen.set(cx, cy, cc)
-            screen.set(*STOP_BTN, (120, 20, 20))                # stop back to set
+            self._digits(screen, col)
+            for cx, cy in RUN_CENTER:                            # pause / resume
+                screen.set(cx, cy, (255, 170, 0) if not self.running else (0, 120, 0))
+            screen.set(*RUN_STOP, (200, 40, 40))                 # stop
+            screen.set(*RUN_EXTEND, (0, 190, 90))                # +1 min
+            screen.set(*RUN_RESTART, (0, 120, 220))              # restart
 
 
 if __name__ == "__main__":
