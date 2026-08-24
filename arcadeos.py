@@ -40,7 +40,9 @@ CONFIG_PATH = Path(__file__).resolve().parent / "arcadeos.json"
 
 DEFAULT = {"idle_minutes": 10, "corner_taps": 3, "corner_window": 1.5,
            # sound-activated equalizer: play audio -> party; quiet -> ambient
-           "sound_activated": False, "sound_threshold": 0.006, "silence_seconds": 6.0}
+           "sound_activated": False, "sound_threshold": 0.006, "silence_seconds": 6.0,
+           # mirror the board onto a Divoom Pixoo (must be in app mode)
+           "pixoo_mirror": False}
 
 APPS = [
     # (name, class, icon quad colours [tl, tr, bl, br], position) — 3x3 grid
@@ -106,6 +108,15 @@ class ArcadeOS(Game):
             self.notify.on_marquee = lambda text: setattr(self, "pending_marquee", text)
         except Exception as exc:  # noqa: BLE001
             log(f"notification service not started: {exc!r}")
+        self.pixoo = None
+        if self.cfg.get("pixoo_mirror"):
+            try:
+                from pixoo_mirror import PixooMirror
+
+                self.pixoo = PixooMirror()
+                log("pixoo mirror started (put the Pixoo in app mode)")
+            except Exception as exc:  # noqa: BLE001
+                log(f"pixoo mirror failed: {exc!r}")
         log("ArcadeOS home — press an icon: " + " ".join(n for n, *_ in APPS))
         if self.bus is not None:            # sound-activated: rest in ambient
             self.enter("ambient")
@@ -233,6 +244,8 @@ class ArcadeOS(Game):
             self.app.draw(screen)
             if self.notify:
                 self.notify.draw_overlay(screen, time.monotonic())
+            if self.pixoo:
+                self.pixoo.set_board_frame(screen.px)
             return
         now = time.monotonic()
         screen.clear((0, 0, 0))
@@ -244,6 +257,8 @@ class ArcadeOS(Game):
         screen.set(0, 11, (0, pulse, pulse // 2))
         if self.notify:
             self.notify.draw_overlay(screen, now)
+        if self.pixoo:
+            self.pixoo.set_board_frame(screen.px)
 
 
 if __name__ == "__main__":

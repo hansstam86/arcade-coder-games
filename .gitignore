@@ -5,3 +5,6 @@ device_config.json
 launch_target.txt
 POST_DRAFTS.md
 sysaudio_helper
+sysaudio_helper
+atech_backup/
+*_probe*.py
