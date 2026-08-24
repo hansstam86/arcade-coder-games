@@ -101,11 +101,16 @@ class ArcadeOS(Game):
         self.pending_marquee: str | None = None
         self.marquee_return_to: str | None = None
         self.marquee_return_at = 0.0
+        from notifcenter import NotifCenter
+
+        self.center = NotifCenter()       # on-board notification center (modal)
+        self.in_center = False
+        self.center_return_to: str | None = None
         try:
             from notifd import ensure_server as notify_server
 
             self.notify = notify_server()
-            self.notify.on_marquee = lambda text: setattr(self, "pending_marquee", text)
+            self.notify.on_notification = self.center.add
         except Exception as exc:  # noqa: BLE001
             log(f"notification service not started: {exc!r}")
         self.pixoo = None
@@ -162,6 +167,9 @@ class ArcadeOS(Game):
     def on_press(self, x, y):
         now = time.monotonic()
         self.last_press = now
+        if self.in_center:                          # a press marks the alert read
+            self.center.press(x, y)
+            return
         # hot corner: N taps on (0,0) within the window -> home
         if (x, y) == (0, 0) and self.app_name != "home":
             self.corner_taps = [t for t in self.corner_taps if now - t < self.cfg["corner_window"]]
@@ -209,7 +217,16 @@ class ArcadeOS(Game):
             self.marquee_return_at = 0.0               # a manual switch cancels the return
             self.enter(name)
         if self.app is not None:
-            self.app.update(dt)
+            self.app.update(dt)                     # underlying app keeps running
+        # notification center: modal, overrides everything until all are read
+        if self.center.has_unread() and not self.in_center:
+            self.in_center = True
+            log(f"notification center: {self.center.unread()} unread (press to dismiss)")
+        elif self.in_center and not self.center.has_unread():
+            self.in_center = False
+            log("notifications cleared")
+        if self.in_center:                          # nothing else runs while modal
+            return
         if (self.cfg["idle_minutes"] > 0            # 0 = auto-ambient disabled
                 and self.app_name not in ("home", "ambient")
                 and not self.auto_ambient_from
@@ -240,6 +257,11 @@ class ArcadeOS(Game):
             log("quiet — back to ambient")
 
     def draw(self, screen):
+        if self.in_center:                          # modal: the alert owns the screen
+            self.center.draw(screen, time.monotonic())
+            if self.pixoo:
+                self.pixoo.set_board_frame(screen.px)
+            return
         if self.app is not None:
             self.app.draw(screen)
             if self.notify:

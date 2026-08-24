@@ -91,20 +91,26 @@ class NotifyService:
         self.next_port_try = 0.0
         self.pending_off: list[tuple[float, int, int]] = []
         self.events: "queue.Queue[dict]" = queue.Queue()
-        self.on_marquee = None            # callback(text) set by ArcadeOS
+        self.on_marquee = None            # legacy: callback(text)
+        self.on_notification = None       # callback(app, title, body, color)
         self.lock = threading.Lock()
         threading.Thread(target=self._nc_poller, daemon=True).start()
 
     # -- rule engine ---------------------------------------------------------
-    def _do_marquee(self, prefix: str, title: str, body: str) -> None:
-        if self.on_marquee is None:
-            return
-        parts = [p.strip() for p in (title, body) if p and p.strip()]
-        text = prefix + ("  " + " ".join(parts) if parts else "")
-        try:
-            self.on_marquee(text)
-        except Exception:
-            pass
+    def _notify_ui(self, app: str, title: str, body: str, color) -> None:
+        """Prefer the on-board notification center; fall back to a scroll."""
+        if self.on_notification is not None:
+            try:
+                self.on_notification(friendly_app(app), title, body, color)
+                return
+            except Exception:
+                pass
+        if self.on_marquee is not None:
+            parts = [p.strip() for p in (title, body) if p and p.strip()]
+            try:
+                self.on_marquee(friendly_app(app) + ("  " + " ".join(parts) if parts else ""))
+            except Exception:
+                pass
 
     def handle(self, app: str, title: str, body: str = "") -> str | None:
         now = time.monotonic()
@@ -124,7 +130,7 @@ class NotifyService:
             self.last_fired[rule["name"]] = now
             self.fire(rule)
             if rule.get("marquee") or self.cfg.get("show_all", True):
-                self._do_marquee(friendly_app(app), title, body)
+                self._notify_ui(app, title, body, rule.get("color", [0, 150, 255]))
             log(f"notification: {app!r} -> rule '{rule['name']}'")
             return rule["name"]
         # no rule matched: show it anyway (any and all notifications)
@@ -135,8 +141,7 @@ class NotifyService:
             self.last_fired["__all__"] = now
             d["name"] = "all"
             self.fire(d)
-            if d.get("marquee", True):
-                self._do_marquee(friendly_app(app), title, body)
+            self._notify_ui(app, title, body, d.get("color", [0, 150, 255]))
             log(f"notification: {app!r} -> show-all")
             return "all"
         return None

@@ -169,6 +169,16 @@ Spotify to the EP-133 through speakers — digitally via ScreenCaptureKit
 an audio input device (the EP-133's USB audio stream) when unavailable;
 `party.json` picks source and device. Runs as an ArcadeOS app (rainbow icon).
 
+## Notification center
+
+Every macOS notification queues on the board and **stays until you press a pad
+to mark it read** (modal — it overrides the equalizer, games, and idle). Shows
+the alert text scrolling with the source app name, a coloured border, unread-
+count dots on the top row, and a pulsing dismiss bar. When the queue is empty
+the board returns to what it was doing. `show_all` (default on) means *all*
+notifications show; per-app rules add custom colour/EP-133 sound. Needs Full
+Disk Access for the Notification Center source; the webhook always works.
+
 ## Notifications — see them on the board, hear them on the EP-133
 
 ArcadeOS runs a notification service: rules map alerts (e.g. Slack) to a
