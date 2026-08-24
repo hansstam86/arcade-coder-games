@@ -25,6 +25,13 @@
   .links { margin-top: 26px; font-size: 13px; display: flex; gap: 16px; flex-wrap: wrap; }
   .links a { color: #7a86ff; text-decoration: none; }
   #msg { margin-top: 14px; font-size: 12px; opacity: .8; min-height: 16px; }
+  .marquee-box { margin-top: 20px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .marquee-box input[type=text], #marqueeText {
+    flex: 1; min-width: 180px; padding: 8px 12px; border: 1px solid #2a2f3a;
+    border-radius: 10px; background: #1b1d24; color: #d5dae4; font: 500 14px system-ui; }
+  #marqueeSend { padding: 8px 14px; border: 1px solid #2c4a6e; border-radius: 10px;
+    background: #1d2b4a; color: #b7d4ee; font: 500 13px system-ui; cursor: pointer; }
+  #marqueeSend:hover { background: #233a59; }
 </style>
 </head>
 <body>
@@ -32,6 +39,11 @@
   <h1>ArcadeOS</h1>
   <div id="state">connecting&hellip;</div>
   <div class="apps" id="apps"></div>
+  <div class="marquee-box">
+    <input id="marqueeText" placeholder="scrolling message…" maxlength="120">
+    <label style="font-size:12px"><input id="marqueeRainbow" type="checkbox" checked> rainbow</label>
+    <button id="marqueeSend">show on board &rarr;</button>
+  </div>
   <div id="msg"></div>
   <div class="links">
     <a href="https://hansstam86.github.io/arcade-coder-games/">studio</a>
@@ -74,6 +86,21 @@ function renderApps(names) {
     appsEl.appendChild(b);
   }
 }
+
+document.getElementById("marqueeSend").addEventListener("click", async () => {
+  const text = document.getElementById("marqueeText").value.trim();
+  if (!text) { msg.textContent = "type a message first"; return; }
+  const rainbow = document.getElementById("marqueeRainbow").checked;
+  try {
+    await fetch(API + "/marquee", { method: "POST",
+      body: JSON.stringify({ text: text + "  ", rainbow, show: true }),
+      headers: { "Content-Type": "application/json" } });
+    msg.textContent = "sent to the board";
+  } catch (e) { msg.textContent = "lost connection to ArcadeOS"; }
+});
+document.getElementById("marqueeText").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") document.getElementById("marqueeSend").click();
+});
 
 async function poll() {
   try {

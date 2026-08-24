@@ -34,6 +34,7 @@ from midiviz import MidiViz
 from rhythm import Rhythm
 from ambient import Ambient
 from party import Party
+from marquee import Marquee
 
 CONFIG_PATH = Path(__file__).resolve().parent / "arcadeos.json"
 
@@ -42,15 +43,16 @@ DEFAULT = {"idle_minutes": 10, "corner_taps": 3, "corner_window": 1.5,
            "sound_activated": False, "sound_threshold": 0.006, "silence_seconds": 6.0}
 
 APPS = [
-    # (name, class, icon quad colours [tl, tr, bl, br], position)
-    ("games", Arcade, [(0, 180, 0), (200, 0, 0), (200, 180, 0), (0, 60, 220)], (1, 2)),
-    ("deck", Deck, [(230, 230, 230)] * 4, (4, 2)),
-    ("kopads", KOPads, [(240, 90, 0), (220, 200, 0), (230, 230, 230), (200, 0, 60)], (7, 2)),
-    ("seq", Sequencer, [(0, 200, 0), (0, 200, 0), (2, 2, 10), (0, 200, 0)], (10, 2)),
-    ("midiviz", MidiViz, [(200, 0, 180), (0, 190, 190), (0, 190, 190), (200, 0, 180)], (1, 7)),
-    ("rhythm", Rhythm, [(200, 0, 60), (220, 200, 0), (220, 200, 0), (200, 0, 60)], (4, 7)),
-    ("ambient", Ambient, [(0, 40, 120), (0, 60, 160), (0, 60, 160), (0, 40, 120)], (7, 7)),
-    ("party", Party, [(0, 220, 0), (255, 220, 0), (255, 60, 0), (180, 0, 255)], (10, 7)),
+    # (name, class, icon quad colours [tl, tr, bl, br], position) — 3x3 grid
+    ("games", Arcade, [(0, 180, 0), (200, 0, 0), (200, 180, 0), (0, 60, 220)], (1, 1)),
+    ("deck", Deck, [(230, 230, 230)] * 4, (5, 1)),
+    ("kopads", KOPads, [(240, 90, 0), (220, 200, 0), (230, 230, 230), (200, 0, 60)], (9, 1)),
+    ("seq", Sequencer, [(0, 200, 0), (0, 200, 0), (2, 2, 10), (0, 200, 0)], (1, 5)),
+    ("midiviz", MidiViz, [(200, 0, 180), (0, 190, 190), (0, 190, 190), (200, 0, 180)], (5, 5)),
+    ("rhythm", Rhythm, [(200, 0, 60), (220, 200, 0), (220, 200, 0), (200, 0, 60)], (9, 5)),
+    ("ambient", Ambient, [(0, 40, 120), (0, 60, 160), (0, 60, 160), (0, 40, 120)], (1, 9)),
+    ("party", Party, [(0, 220, 0), (255, 220, 0), (255, 60, 0), (180, 0, 255)], (5, 9)),
+    ("marquee", Marquee, [(0, 200, 255), (0, 120, 255), (0, 120, 255), (0, 200, 255)], (9, 9)),
 ]
 APP_BY_NAME = {name: cls for name, cls, _i, _p in APPS}
 

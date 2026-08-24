@@ -1,0 +1,16 @@
+{
+  "text": "HANS WAS HERE  ",
+  "color": [
+    0,
+    200,
+    255
+  ],
+  "rainbow": true,
+  "speed": 7.0,
+  "background": [
+    0,
+    0,
+    6
+  ],
+  "y": 3
+}

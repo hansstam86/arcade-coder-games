@@ -71,14 +71,30 @@ class Handler(BaseHTTPRequestHandler):
         if not _origin_ok(self.headers.get("Origin", "")):
             self._send(403, b"origin not allowed", "text/plain")
             return
-        if self.path != "/switch":
-            self._send(404, b"not found", "text/plain")
-            return
         length = int(self.headers.get("Content-Length", 0))
         try:
             body = json.loads(self.rfile.read(length))
         except json.JSONDecodeError:
             self._send(400, b"invalid JSON", "text/plain")
+            return
+        if self.path == "/marquee":
+            from pathlib import Path
+
+            cfg_path = Path(__file__).resolve().parent / "marquee.json"
+            try:
+                cfg = json.loads(cfg_path.read_text()) if cfg_path.exists() else {}
+            except Exception:
+                cfg = {}
+            for k in ("text", "speed", "rainbow", "color", "background"):
+                if k in body:
+                    cfg[k] = body[k]
+            cfg_path.write_text(json.dumps(cfg, indent=2) + "\n")
+            if _os is not None and body.get("show", True):
+                _os.pending_switch = "marquee"    # jump to it so you see the change
+            self._send(200, b"ok", "text/plain")
+            return
+        if self.path != "/switch":
+            self._send(404, b"not found", "text/plain")
             return
         from arcadeos import APP_BY_NAME
 

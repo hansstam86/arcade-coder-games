@@ -142,6 +142,13 @@ echo arcadeos_hw.py > launch_target.txt && open ArcadeMinesweeper.app
 scripts/install_login.sh    # optional: start ArcadeOS at login
 ```
 
+## Scrolling marquee
+
+[marquee.py](marquee.py): a scrolling-text display in a 3×5 pixel font
+(A–Z, 0–9, punctuation), solid or animated-rainbow, with configurable speed.
+Message hot-reloads from `marquee.json`, or set it live from the ArcadeOS
+dashboard's message box (http://127.0.0.1:7770). An ArcadeOS app (cyan icon).
+
 ## Party mode — the board dances to live audio
 
 [party.py](party.py): a 12-band spectrum analyzer with peak-hold dots, a
