@@ -267,15 +267,20 @@ class Ambient(Game):
                 self.cfg.update(json.loads(CONFIG_PATH.read_text()))
             except Exception:
                 pass
-        names = [s.name for s in SCENES]
+        allowed = self.cfg.get("scenes")            # optional allow-list, e.g. ["clock"]
+        self.scenes = ([s for s in SCENES if s.name in allowed] or SCENES) \
+            if isinstance(allowed, list) and allowed else SCENES
+        names = [s.name for s in self.scenes]
         self.idx = names.index(self.cfg["scene"]) if self.cfg["scene"] in names else 0
-        self.scene = SCENES[self.idx](self.cfg)
+        self.scene = self.scenes[self.idx](self.cfg)
         self.next_rotate = time.monotonic() + self.cfg["rotate_minutes"] * 60
-        log(f"ambient up — scene '{self.scene.name}', press any pad for the next one")
+        locked = len(self.scenes) == 1
+        log(f"ambient up — scene '{self.scene.name}'"
+            + ("" if locked else ", press any pad for the next one"))
 
     def _switch(self, idx: int) -> None:
-        self.idx = idx % len(SCENES)
-        self.scene = SCENES[self.idx](self.cfg)
+        self.idx = idx % len(self.scenes)
+        self.scene = self.scenes[self.idx](self.cfg)
         self.cfg["scene"] = self.scene.name
         self.next_rotate = time.monotonic() + self.cfg["rotate_minutes"] * 60
         try:
@@ -285,10 +290,11 @@ class Ambient(Game):
         log(f"scene -> {self.scene.name}")
 
     def on_press(self, x, y):
-        self._switch(self.idx + 1)
+        if len(self.scenes) > 1:                    # locked to one scene -> no cycling
+            self._switch(self.idx + 1)
 
     def update(self, dt):
-        if time.monotonic() >= self.next_rotate:
+        if len(self.scenes) > 1 and time.monotonic() >= self.next_rotate:
             self._switch(self.idx + 1)
 
     def _dim_factor(self) -> float:
