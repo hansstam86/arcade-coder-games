@@ -169,6 +169,14 @@ Spotify to the EP-133 through speakers — digitally via ScreenCaptureKit
 an audio input device (the EP-133's USB audio stream) when unavailable;
 `party.json` picks source and device. Runs as an ArcadeOS app (rainbow icon).
 
+## Volume pads
+
+Dedicated Mac-volume controls: **bottom-left = down, bottom-right = up**,
+handled at the OS level so they work in idle/ambient, the equalizer, home,
+and the notification center (a subtle marker shows them; a green bar flashes
+the level on each press). Set `volume_everywhere:true` in arcadeos.json to
+also override games/deck. `volume_step` sets the increment.
+
 ## Notification center
 
 Reads the macOS Notification Center via **NCReader.app** (build with

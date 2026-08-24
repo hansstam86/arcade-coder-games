@@ -42,7 +42,11 @@ DEFAULT = {"idle_minutes": 10, "corner_taps": 3, "corner_window": 1.5,
            # sound-activated equalizer: play audio -> party; quiet -> ambient
            "sound_activated": False, "sound_threshold": 0.006, "silence_seconds": 6.0,
            # mirror the board onto a Divoom Pixoo (must be in app mode)
-           "pixoo_mirror": False}
+           "pixoo_mirror": False,
+           # dedicated Mac-volume pads: bottom-left = down, bottom-right = up.
+           # Active in idle/ambient, equalizer, home, and the notification
+           # center (set "everywhere" to also override games/deck/etc.).
+           "volume_pads": True, "volume_step": 6, "volume_everywhere": False}
 
 APPS = [
     # (name, class, icon quad colours [tl, tr, bl, br], position) — 3x3 grid
@@ -106,6 +110,17 @@ class ArcadeOS(Game):
         self.center = NotifCenter()       # on-board notification center (modal)
         self.in_center = False
         self.center_return_to: str | None = None
+        self.volume = None                # dedicated Mac-volume pads
+        self.vol_shown_until = 0.0
+        self.vol_level = 0
+        if self.cfg.get("volume_pads"):
+            try:
+                from volume import Volume
+
+                self.volume = Volume()
+                self.vol_level = self.volume.level
+            except Exception as exc:  # noqa: BLE001
+                log(f"volume pads unavailable: {exc!r}")
         try:
             from notifd import ensure_server as notify_server
 
@@ -163,10 +178,27 @@ class ArcadeOS(Game):
             except Exception:
                 pass
 
+    VOL_DOWN = (0, 11)
+    VOL_UP = (11, 11)
+
+    def _volume_active(self) -> bool:
+        if self.volume is None:
+            return False
+        if self.cfg.get("volume_everywhere"):
+            return True
+        # active where a press isn't otherwise doing interactive work
+        return self.in_center or self.app_name in ("home", "ambient", "party")
+
     # -- input ---------------------------------------------------------------
     def on_press(self, x, y):
         now = time.monotonic()
         self.last_press = now
+        # dedicated volume pads (checked first so they always win where active)
+        if self._volume_active() and (x, y) in (self.VOL_DOWN, self.VOL_UP):
+            step = self.cfg.get("volume_step", 6)
+            self.vol_level = self.volume.change(step if (x, y) == self.VOL_UP else -step)
+            self.vol_shown_until = now + 1.2
+            return
         if self.in_center:                          # a press marks the alert read
             self.center.press(x, y)
             return
@@ -257,30 +289,43 @@ class ArcadeOS(Game):
             log("quiet — back to ambient")
 
     def draw(self, screen):
+        now = time.monotonic()
         if self.in_center:                          # modal: the alert owns the screen
-            self.center.draw(screen, time.monotonic())
-            if self.pixoo:
-                self.pixoo.set_board_frame(screen.px)
-            return
-        if self.app is not None:
+            self.center.draw(screen, now)
+        elif self.app is not None:
             self.app.draw(screen)
             if self.notify:
-                self.notify.draw_overlay(screen, time.monotonic())
-            if self.pixoo:
-                self.pixoo.set_board_frame(screen.px)
-            return
-        now = time.monotonic()
-        screen.clear((0, 0, 0))
-        for _name, _cls, icon, (x, y) in APPS:
-            screen.set(x, y, icon[0]); screen.set(x + 1, y, icon[1])
-            screen.set(x, y + 1, icon[2]); screen.set(x + 1, y + 1, icon[3])
-        # heartbeat pixel so home doesn't look frozen
-        pulse = int(40 + 30 * (0.5 + 0.5 * __import__("math").sin(now * 2)))
-        screen.set(0, 11, (0, pulse, pulse // 2))
-        if self.notify:
-            self.notify.draw_overlay(screen, now)
+                self.notify.draw_overlay(screen, now)
+        else:
+            screen.clear((0, 0, 0))
+            for _name, _cls, icon, (x, y) in APPS:
+                screen.set(x, y, icon[0]); screen.set(x + 1, y, icon[1])
+                screen.set(x, y + 1, icon[2]); screen.set(x + 1, y + 1, icon[3])
+            pulse = int(40 + 30 * (0.5 + 0.5 * __import__("math").sin(now * 2)))
+            screen.set(6, 11, (0, pulse, pulse // 2))   # heartbeat (not on a vol pad)
+            if self.notify:
+                self.notify.draw_overlay(screen, now)
+        self._draw_volume(screen, now)              # dedicated volume pads on top
         if self.pixoo:
             self.pixoo.set_board_frame(screen.px)
+
+    def _draw_volume(self, screen, now: float) -> None:
+        if not self._volume_active():
+            return
+        dx, dy = self.VOL_DOWN
+        ux, uy = self.VOL_UP
+        screen.set(dx, dy, (0, 40, 80))             # subtle − marker (blue)
+        screen.set(ux, uy, (0, 80, 20))             # subtle + marker (green)
+        if now < self.vol_shown_until:              # feedback bar after a press
+            lit = round(self.vol_level / 100 * 12)
+            for x in range(12):
+                if x < lit:
+                    g = 140 + int(x / 11 * 115)
+                    screen.set(x, 10, (0, g, 40))
+                else:
+                    screen.set(x, 10, (10, 10, 14))
+            screen.set(dx, dy, (0, 120, 255))       # brighten the pressed controls
+            screen.set(ux, uy, (0, 255, 90))
 
 
 if __name__ == "__main__":
