@@ -256,11 +256,21 @@ class NotifyService:
     # notification to our /notify webhook. It must run as its own app (via
     # `open`) so the Full Disk Access granted to NCReader.app applies to it.
     def _nc_poller(self) -> None:
-        # NCReader.app runs as a LaunchAgent (see scripts/install_ncreader.sh)
-        # and POSTs notifications to /notify and its state to /nc_status. The
-        # reader survives ArcadeOS restarts; nothing to launch here.
-        if self.nc_status in ("starting", None):
-            self.nc_status = "waiting for NCReader (grant it Full Disk Access)"
+        # Launch NCReader.app via LaunchServices (`open`) so it runs with its
+        # full bundle identity — that's what makes the Full Disk Access grant
+        # apply. It reads the NC database and POSTs to /notify + /nc_status.
+        import subprocess
+
+        app = ROOT / "NCReader.app"
+        if not app.exists():
+            self.nc_status = "NCReader.app missing (rebuild it — see README)"
+            return
+        while True:
+            try:
+                subprocess.run(["open", "-g", str(app)], timeout=10, capture_output=True)
+            except Exception as exc:  # noqa: BLE001
+                self.nc_status = f"could not launch NCReader.app: {exc}"
+            time.sleep(30.0)     # `open` no-ops if it's already running
 
 
 SERVICE: NotifyService | None = None

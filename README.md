@@ -171,6 +171,11 @@ an audio input device (the EP-133's USB audio stream) when unavailable;
 
 ## Notification center
 
+Reads the macOS Notification Center via **NCReader.app** (build with
+`scripts/build_ncreader.sh`; grant it Full Disk Access — macOS ties FDA to
+the bundle identity and only honours it when launched via LaunchServices,
+which ArcadeOS does). It POSTs each notification to the service webhook.
+
 Every macOS notification queues on the board and **stays until you press a pad
 to mark it read** (modal — it overrides the equalizer, games, and idle). Shows
 the alert text scrolling with the source app name, a coloured border, unread-
