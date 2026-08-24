@@ -88,6 +88,10 @@ function render() {
         <option value="yes"${r.enabled !== false ? " selected" : ""}>yes</option>
         <option value="no"${r.enabled === false ? " selected" : ""}>no</option>
       </select></label>
+      <label>scroll text<select data-k="marquee">
+        <option value="yes"${r.marquee ? " selected" : ""}>yes</option>
+        <option value="no"${!r.marquee ? " selected" : ""}>no</option>
+      </select></label>
       <div class="actions">
         <button data-act="test">&#9654; test</button>
         <button data-act="del" class="danger">delete</button>
@@ -96,6 +100,7 @@ function render() {
       const k = inp.dataset.k;
       if (k === "color") r.color = hexRgb(inp.value);
       else if (k === "enabled") r.enabled = inp.value === "yes";
+      else if (k === "marquee") r.marquee = inp.value === "yes";
       else if (["note", "velocity", "cooldown"].includes(k)) r[k] = +inp.value || 0;
       else if (k === "duration") r[k] = +inp.value || 2.5;
       else r[k] = inp.value;

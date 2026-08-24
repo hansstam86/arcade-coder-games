@@ -37,7 +37,7 @@ DEFAULT = {
         {"name": "slack", "app_contains": "slack", "title_contains": "",
          "color": [240, 120, 0], "style": "border", "note": 39,
          "velocity": 110, "channel": 0, "duration": 2.5, "cooldown": 4,
-         "enabled": True},
+         "marquee": True, "enabled": True},
         {"name": "mail", "app_contains": "mail", "title_contains": "",
          "color": [0, 90, 240], "style": "corner", "note": 37,
          "velocity": 100, "channel": 0, "duration": 2.0, "cooldown": 8,
@@ -68,6 +68,7 @@ class NotifyService:
         self.next_port_try = 0.0
         self.pending_off: list[tuple[float, int, int]] = []
         self.events: "queue.Queue[dict]" = queue.Queue()
+        self.on_marquee = None            # callback(text) set by ArcadeOS
         self.lock = threading.Lock()
         threading.Thread(target=self._nc_poller, daemon=True).start()
 
@@ -89,6 +90,16 @@ class NotifyService:
                 return rule["name"]
             self.last_fired[rule["name"]] = now
             self.fire(rule)
+            if rule.get("marquee") and self.on_marquee is not None:
+                text = (title or "").strip()
+                if body:
+                    text += (": " if text else "") + body.strip()
+                if not text:
+                    text = rule["name"]
+                try:
+                    self.on_marquee(text)
+                except Exception:
+                    pass
             log(f"notification: {app!r} -> rule '{rule['name']}'")
             return rule["name"]
         return None

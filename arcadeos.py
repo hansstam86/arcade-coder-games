@@ -96,10 +96,14 @@ class ArcadeOS(Game):
         except Exception as exc:  # noqa: BLE001
             log(f"dashboard not started: {exc!r}")
         self.notify = None
+        self.pending_marquee: str | None = None
+        self.marquee_return_to: str | None = None
+        self.marquee_return_at = 0.0
         try:
             from notifd import ensure_server as notify_server
 
             self.notify = notify_server()
+            self.notify.on_marquee = lambda text: setattr(self, "pending_marquee", text)
         except Exception as exc:  # noqa: BLE001
             log(f"notification service not started: {exc!r}")
         log("ArcadeOS home — press an icon: " + " ".join(n for n, *_ in APPS))
@@ -173,9 +177,25 @@ class ArcadeOS(Game):
     # -- loop ----------------------------------------------------------------
     def update(self, dt):
         now = time.monotonic()
+        if self.pending_marquee is not None:           # a notification wants to scroll
+            text, self.pending_marquee = self.pending_marquee, None
+            if self.app_name != "marquee":
+                self.marquee_return_to = self.app_name
+            self.enter("marquee")
+            self.app.set_text(text)
+            # one full scroll pass, then return to where we were
+            dur = (self.app.total + 24) / max(1.0, self.app.cfg["speed"]) + 0.5
+            self.marquee_return_at = now + dur
+            log(f"notification marquee: {text!r} ({dur:.0f}s)")
+        if self.marquee_return_at and now >= self.marquee_return_at:
+            self.marquee_return_at = 0.0
+            back = self.marquee_return_to or "ambient"
+            self.marquee_return_to = None
+            self.enter(back)
         if self.pending_switch:                        # from the web dashboard
             name, self.pending_switch = self.pending_switch, None
             self.auto_ambient_from = None
+            self.marquee_return_at = 0.0               # a manual switch cancels the return
             self.enter(name)
         if self.app is not None:
             self.app.update(dt)
