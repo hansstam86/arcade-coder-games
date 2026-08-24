@@ -10,3 +10,4 @@ atech_backup/
 *_probe*.py
 ncread_helper
 NCReader.app/
+bin/

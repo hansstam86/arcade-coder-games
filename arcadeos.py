@@ -38,6 +38,7 @@ from marquee import Marquee
 from pomodoro import Pomodoro
 from countdown import Countdown
 from weather import Weather
+from onair import OnAir
 import macapps
 import firefox
 
@@ -75,8 +76,15 @@ APPS = [
     ("pomodoro", Pomodoro, [(255, 70, 40), (255, 70, 40), (0, 200, 90), (0, 200, 90)], (1, 10)),
     ("countdown", Countdown, [(235, 235, 235), (235, 235, 235), (0, 180, 220), (0, 180, 220)], (9, 10)),
     ("weather", Weather, [(120, 200, 255), (255, 210, 0), (120, 200, 255), (180, 220, 255)], (5, 10)),
+    ("onair", OnAir, [(220, 0, 0), (220, 0, 0), (0, 180, 60), (0, 180, 60)], (5, 10)),
 ]
 APP_BY_NAME = {name: cls for name, cls, _i, _p in APPS}
+
+# home launcher is paged: 3 cols x 4 rows of 2x2 icons per page (stored icon
+# positions above are vestigial — layout is computed from these slots).
+HOME_SLOTS = [(c, r) for r in (1, 4, 7, 10) for c in (1, 5, 9)]
+PER_PAGE = len(HOME_SLOTS)
+HOME_PAGES = (len(APPS) + PER_PAGE - 1) // PER_PAGE
 
 
 def log(msg: str) -> None:
@@ -95,6 +103,7 @@ class ArcadeOS(Game):
                 pass
         self.app = None
         self.app_name = "home"
+        self.home_page = 0
         self.auto_ambient_from: str | None = None
         self.last_press = time.monotonic()
         self.corner_taps: list[float] = []
@@ -236,7 +245,11 @@ class ArcadeOS(Game):
             return
         # app-cycle pads (top corners) — always, except while dismissing alerts
         if self.cfg.get("nav_pads") and not self.in_center and (x, y) in (self.APP_PREV, self.APP_NEXT):
-            self._cycle_app(1 if (x, y) == self.APP_NEXT else -1)
+            if self.app_name == "home" and HOME_PAGES > 1:      # on home they flip pages
+                self.home_page = (self.home_page
+                                  + (1 if (x, y) == self.APP_NEXT else -1)) % HOME_PAGES
+            else:
+                self._cycle_app(1 if (x, y) == self.APP_NEXT else -1)
             return
         # mac-app switch pads (top edge, inside the nav pads) — like Cmd-Tab
         if self.cfg.get("mac_nav_pads") and not self.in_center and (x, y) in (self.MAC_PREV, self.MAC_NEXT):
@@ -257,7 +270,8 @@ class ArcadeOS(Game):
             self.enter(back)
             return
         if self.app_name == "home":
-            for name, _cls, _icon, (bx, by) in APPS:
+            page = APPS[self.home_page * PER_PAGE:(self.home_page + 1) * PER_PAGE]
+            for (name, _cls, _icon, _p), (bx, by) in zip(page, HOME_SLOTS):
                 if bx - 1 <= x <= bx + 2 and by - 1 <= y <= by + 1:
                     self.enter(name)
                     return
@@ -337,11 +351,17 @@ class ArcadeOS(Game):
                 self.notify.draw_overlay(screen, now)
         else:
             screen.clear((0, 0, 0))
-            for _name, _cls, icon, (x, y) in APPS:
+            page = APPS[self.home_page * PER_PAGE:(self.home_page + 1) * PER_PAGE]
+            for (_name, _cls, icon, _p), (x, y) in zip(page, HOME_SLOTS):
                 screen.set(x, y, icon[0]); screen.set(x + 1, y, icon[1])
                 screen.set(x, y + 1, icon[2]); screen.set(x + 1, y + 1, icon[3])
             pulse = int(40 + 30 * (0.5 + 0.5 * __import__("math").sin(now * 2)))
-            screen.set(6, 11, (0, pulse, pulse // 2))   # heartbeat (not on a vol pad)
+            if HOME_PAGES > 1:                          # page dots on the bottom row
+                for p in range(HOME_PAGES):
+                    on = p == self.home_page
+                    screen.set(4 + p, 11, (pulse + 60, pulse + 60, pulse + 60) if on else (30, 30, 30))
+            else:
+                screen.set(6, 11, (0, pulse, pulse // 2))   # heartbeat
             if self.notify:
                 self.notify.draw_overlay(screen, now)
         self._draw_volume(screen, now)              # dedicated volume pads on top
