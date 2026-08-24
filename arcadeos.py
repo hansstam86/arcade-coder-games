@@ -91,6 +91,7 @@ class ArcadeOS(Game):
 
     # -- app switching -------------------------------------------------------
     def enter(self, name: str) -> None:
+        self.last_press = time.monotonic()   # any entry counts as activity
         if name == "home":
             self._cleanup()
             self.app, self.app_name = None, "home"
