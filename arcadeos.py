@@ -39,6 +39,7 @@ from pomodoro import Pomodoro
 from countdown import Countdown
 from weather import Weather
 from onair import OnAir
+from ytmusic import YTMusic
 import macapps
 import firefox
 
@@ -77,6 +78,7 @@ APPS = [
     ("countdown", Countdown, [(235, 235, 235), (235, 235, 235), (0, 180, 220), (0, 180, 220)], (9, 10)),
     ("weather", Weather, [(120, 200, 255), (255, 210, 0), (120, 200, 255), (180, 220, 255)], (5, 10)),
     ("onair", OnAir, [(220, 0, 0), (220, 0, 0), (0, 180, 60), (0, 180, 60)], (5, 10)),
+    ("ytmusic", YTMusic, [(230, 0, 0), (255, 255, 255), (230, 0, 0), (230, 0, 0)], (9, 10)),
 ]
 APP_BY_NAME = {name: cls for name, cls, _i, _p in APPS}
 
@@ -176,7 +178,7 @@ class ArcadeOS(Game):
             return
         self._cleanup()
         self.app = cls()
-        if name == "party" and self.bus is not None:
+        if name in ("party", "ytmusic") and self.bus is not None:
             self.app.audio_bus = self.bus     # share the one capture
         self.app.start()
         self.app_name = name
@@ -215,7 +217,7 @@ class ArcadeOS(Game):
         if self.cfg.get("volume_everywhere"):
             return True
         # active where a press isn't otherwise doing interactive work
-        return self.in_center or self.app_name in ("home", "ambient", "party")
+        return self.in_center or self.app_name in ("home", "ambient", "party", "ytmusic")
 
     def _cycle_order(self):
         return ["home"] + [name for name, *_ in APPS]
