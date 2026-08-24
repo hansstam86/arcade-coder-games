@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arcade Coder — App Organizer</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0d0f14; color: #e8ecf2; padding: 24px; min-height: 100vh;
+  }
+  h1 { font-size: 22px; margin: 0 0 2px; letter-spacing: .2px; }
+  .sub { color: #8b94a3; margin: 0 0 22px; font-size: 13px; }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  .panel { background: #151922; border: 1px solid #232a37; border-radius: 14px; padding: 18px; margin-bottom: 20px; }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .12em; color: #8b94a3; margin: 0 0 14px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .cell, .chip {
+    position: relative; border-radius: 12px; min-height: 74px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 7px; user-select: none; text-align: center;
+  }
+  .cell { border: 1.5px dashed #2c3444; background: #10141c; transition: border-color .12s, background .12s; }
+  .cell.empty::after { content: "empty"; color: #3f4757; font-size: 12px; }
+  .cell.over, .drawer.over { border-color: #4f8cff; background: #17203099; }
+  .chip {
+    cursor: grab; padding: 10px 8px; background: #1b2130; border: 1px solid #2c3444;
+  }
+  .cell .chip { position: absolute; inset: 0; margin: 0; border: none; background: transparent; }
+  .chip:active { cursor: grabbing; }
+  .icon { width: 26px; height: 26px; border-radius: 6px; overflow: hidden;
+    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; box-shadow: 0 1px 4px #0008; }
+  .icon span { display: block; }
+  .name { font-size: 12px; color: #cfd6e2; font-weight: 500; letter-spacing: .2px; }
+  .drawer { display: flex; flex-wrap: wrap; gap: 10px; min-height: 74px;
+    border: 1.5px dashed #2c3444; border-radius: 12px; padding: 12px; background: #10141c; }
+  .drawer .chip { min-height: 0; width: 92px; }
+  .drawer .empty-note { color: #3f4757; font-size: 12px; align-self: center; }
+  .bar { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+  button { font: inherit; color: #e8ecf2; background: #202838; border: 1px solid #313b4d;
+    border-radius: 9px; padding: 8px 14px; cursor: pointer; }
+  button:hover { background: #273143; }
+  .status { font-size: 13px; color: #6ee7a0; margin-left: auto; opacity: 0; transition: opacity .2s; }
+  .status.show { opacity: 1; }
+  .tip { color: #7b8494; font-size: 12.5px; margin: 10px 2px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎛️ App Organizer</h1>
+  <p class="sub">Drag apps onto the grid to place them on the board's home screen, drag them off to remove. Changes apply to the Arcade Coder live.</p>
+
+  <div class="panel">
+    <h2>Home screen · 3 × 5</h2>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Available apps</h2>
+    <div class="drawer" id="drawer"></div>
+    <p class="tip">The grid order is the order the on-board ‹ › app-cycle pads follow. Drop one app on another to swap them.</p>
+  </div>
+
+  <div class="bar">
+    <button id="reset">Reset to default</button>
+    <button id="clear">Clear all</button>
+    <span class="status" id="status">Saved ✓</span>
+  </div>
+</div>
+
+<script>
+let SLOTS = [];      // length = cols*rows, app-name or null
+let REGISTRY = {};   // name -> {name, icon:[hex×4]}
+let COLS = 3, ROWS = 5;
+
+const grid = document.getElementById('grid');
+const drawer = document.getElementById('drawer');
+const statusEl = document.getElementById('status');
+let drag = null;     // {from:'slot',index} | {from:'drawer',name}
+
+async function load() {
+  const r = await fetch('/apps');
+  const d = await r.json();
+  COLS = d.cols; ROWS = d.rows;
+  SLOTS = d.slots.slice();
+  REGISTRY = {};
+  d.registry.forEach(a => REGISTRY[a.name] = a);
+  render();
+}
+
+function iconEl(name) {
+  const a = REGISTRY[name];
+  const el = document.createElement('div');
+  el.className = 'icon';
+  (a ? a.icon : ['#333','#333','#333','#333']).forEach(c => {
+    const s = document.createElement('span'); s.style.background = c; el.appendChild(s);
+  });
+  return el;
+}
+
+function chip(name, source) {
+  const c = document.createElement('div');
+  c.className = 'chip';
+  c.draggable = true;
+  c.appendChild(iconEl(name));
+  const nm = document.createElement('div'); nm.className = 'name'; nm.textContent = name;
+  c.appendChild(nm);
+  c.addEventListener('dragstart', e => {
+    drag = source; e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', name);
+  });
+  return c;
+}
+
+function render() {
+  grid.innerHTML = '';
+  for (let i = 0; i < COLS * ROWS; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cell' + (SLOTS[i] ? '' : ' empty');
+    cell.dataset.index = i;
+    if (SLOTS[i]) cell.appendChild(chip(SLOTS[i], {from:'slot', index:i}));
+    cell.addEventListener('dragover', e => { e.preventDefault(); cell.classList.add('over'); });
+    cell.addEventListener('dragleave', () => cell.classList.remove('over'));
+    cell.addEventListener('drop', e => { e.preventDefault(); cell.classList.remove('over'); dropOnSlot(i); });
+    grid.appendChild(cell);
+  }
+  const placed = new Set(SLOTS.filter(Boolean));
+  drawer.innerHTML = '';
+  const avail = Object.keys(REGISTRY).filter(n => !placed.has(n));
+  if (!avail.length) {
+    const e = document.createElement('div'); e.className = 'empty-note';
+    e.textContent = 'All apps are placed.'; drawer.appendChild(e);
+  }
+  avail.forEach(n => drawer.appendChild(chip(n, {from:'drawer', name:n})));
+}
+
+function dropOnSlot(i) {
+  if (!drag) return;
+  if (drag.from === 'drawer') {
+    SLOTS[i] = drag.name;                         // placing (may overwrite -> old returns to drawer)
+  } else {
+    const j = drag.index;
+    [SLOTS[i], SLOTS[j]] = [SLOTS[j], SLOTS[i]];   // swap
+  }
+  drag = null; render(); save();
+}
+
+drawer.addEventListener('dragover', e => { e.preventDefault(); drawer.classList.add('over'); });
+drawer.addEventListener('dragleave', () => drawer.classList.remove('over'));
+drawer.addEventListener('drop', e => {
+  e.preventDefault(); drawer.classList.remove('over');
+  if (drag && drag.from === 'slot') { SLOTS[drag.index] = null; render(); save(); }
+  drag = null;
+});
+
+let saveTimer = null;
+async function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    statusEl.textContent = 'Saving…'; statusEl.classList.add('show');
+    try {
+      await fetch('/apps', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({slots: SLOTS})});
+      statusEl.textContent = 'Saved ✓ — live on the board';
+    } catch (e) { statusEl.textContent = 'Save failed'; }
+    setTimeout(() => statusEl.classList.remove('show'), 1600);
+  }, 150);
+}
+
+document.getElementById('reset').addEventListener('click', () => {
+  const all = Object.keys(REGISTRY);
+  SLOTS = Array.from({length: COLS*ROWS}, (_, i) => all[i] || null);
+  render(); save();
+});
+document.getElementById('clear').addEventListener('click', () => {
+  SLOTS = SLOTS.map(() => null); render(); save();
+});
+
+load();
+</script>
+</body>
+</html>

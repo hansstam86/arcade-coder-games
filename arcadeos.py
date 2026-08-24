@@ -82,10 +82,35 @@ APPS = [
     ("ytmusic", YTMusic, [(230, 0, 0), (255, 255, 255), (230, 0, 0), (230, 0, 0)], (9, 10)),
 ]
 APP_BY_NAME = {name: cls for name, cls, _i, _p in APPS}
+REGISTRY = {name: (name, cls, icon) for name, cls, icon, _p in APPS}   # all buildable apps
 
 # home launcher: a single 3 cols x 5 rows grid of 2x2 icons, laid out from
 # these slots (the stored icon positions in the APPS tuples are vestigial).
 HOME_SLOTS = [(c, r) for r in (1, 3, 5, 7, 9) for c in (1, 5, 9)]
+
+# apps.json chooses which apps appear on the home grid and in what slot order;
+# edited live by the web organizer (http://127.0.0.1:7770/apps.html).
+LAYOUT_PATH = Path(__file__).resolve().parent / "apps.json"
+
+
+def load_layout_names() -> list:
+    """Return a HOME_SLOTS-length list of app names (or None) for each slot."""
+    names = None
+    if LAYOUT_PATH.exists():
+        try:
+            names = json.loads(LAYOUT_PATH.read_text()).get("slots")
+        except Exception:
+            names = None
+    if not isinstance(names, list):
+        names = [n for n, *_ in APPS]                 # default: registry order
+    out, seen = [], set()
+    for i in range(len(HOME_SLOTS)):
+        nm = names[i] if i < len(names) else None
+        if nm in REGISTRY and nm not in seen:
+            out.append(nm); seen.add(nm)
+        else:
+            out.append(None)
+    return out
 
 
 def log(msg: str) -> None:
@@ -104,6 +129,8 @@ class ArcadeOS(Game):
                 pass
         self.app = None
         self.app_name = "home"
+        self.layout_names = load_layout_names()      # slot -> app name (from apps.json)
+        self.layout_mtime = LAYOUT_PATH.stat().st_mtime if LAYOUT_PATH.exists() else 0.0
         self.auto_ambient_from: str | None = None
         self.last_press = time.monotonic()
         self.corner_taps: list[float] = []
@@ -231,8 +258,15 @@ class ArcadeOS(Game):
         # active where a press isn't otherwise doing interactive work
         return self.in_center or self.app_name in ("home", "ambient", "party", "ytmusic")
 
+    def _active(self):
+        """Yield (grid_pos, name, cls, icon) for each app placed on the home grid."""
+        for slot, name in enumerate(self.layout_names):
+            if name in REGISTRY:
+                nm, cls, icon = REGISTRY[name]
+                yield HOME_SLOTS[slot], nm, cls, icon
+
     def _cycle_order(self):
-        return ["home"] + [name for name, *_ in APPS]
+        return ["home"] + [name for _pos, name, _c, _i in self._active()]
 
     def _cycle_app(self, delta: int) -> None:
         order = self._cycle_order()
@@ -284,7 +318,7 @@ class ArcadeOS(Game):
             self.enter(back)
             return
         if self.app_name == "home":
-            for (name, _cls, _icon, _p), (bx, by) in zip(APPS, HOME_SLOTS):
+            for (bx, by), name, _cls, _icon in self._active():
                 if bx - 1 <= x <= bx + 2 and by <= y <= by + 1:
                     self.enter(name)
                     return
@@ -294,6 +328,12 @@ class ArcadeOS(Game):
     # -- loop ----------------------------------------------------------------
     def update(self, dt):
         now = time.monotonic()
+        if LAYOUT_PATH.exists():                        # hot-reload the home layout
+            m = LAYOUT_PATH.stat().st_mtime
+            if m != self.layout_mtime:
+                self.layout_mtime = m
+                self.layout_names = load_layout_names()
+                log("home layout reloaded from apps.json")
         if self.pending_marquee is not None:           # a notification wants to scroll
             text, self.pending_marquee = self.pending_marquee, None
             if self.app_name != "marquee":
@@ -364,7 +404,7 @@ class ArcadeOS(Game):
                 self.notify.draw_overlay(screen, now)
         else:
             screen.clear((0, 0, 0))
-            for (_name, _cls, icon, _p), (x, y) in zip(APPS, HOME_SLOTS):
+            for (x, y), _name, _cls, icon in self._active():
                 screen.set(x, y, icon[0]); screen.set(x + 1, y, icon[1])
                 screen.set(x, y + 1, icon[2]); screen.set(x + 1, y + 1, icon[3])
             pulse = int(40 + 30 * (0.5 + 0.5 * __import__("math").sin(now * 2)))

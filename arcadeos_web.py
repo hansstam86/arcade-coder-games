@@ -13,6 +13,7 @@ from deck_web import _origin_ok
 PORT = 7770
 ROOT = Path(__file__).resolve().parent
 PAGE = ROOT / "arcadeos_dashboard.html"
+PAGE_APPS = ROOT / "arcadeos_apps.html"
 
 _os = None
 _started = False
@@ -53,6 +54,22 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/":
             self._send(200, PAGE.read_bytes(), "text/html; charset=utf-8")
+        elif self.path in ("/apps.html", "/apps.html/"):
+            self._send(200, PAGE_APPS.read_bytes(), "text/html; charset=utf-8")
+        elif self.path == "/apps":
+            from arcadeos import REGISTRY, load_layout_names
+
+            def hexes(icon):
+                return ["#%02x%02x%02x" % tuple(c) for c in icon]
+
+            body = {
+                "cols": 3, "rows": 5,
+                "slots": load_layout_names(),
+                "registry": [{"name": n, "icon": hexes(icon)}
+                             for n, (_nm, _cls, icon) in REGISTRY.items()],
+                "current": _os.app_name if _os else None,
+            }
+            self._send(200, json.dumps(body).encode(), "application/json")
         elif self.path == "/status":
             from arcadeos import APPS
 
@@ -76,6 +93,23 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length))
         except json.JSONDecodeError:
             self._send(400, b"invalid JSON", "text/plain")
+            return
+        if self.path == "/apps":
+            from arcadeos import REGISTRY, HOME_SLOTS, LAYOUT_PATH
+
+            slots = body.get("slots")
+            if not isinstance(slots, list):
+                self._send(400, b"slots must be a list", "text/plain")
+                return
+            clean, seen = [], set()
+            for i in range(len(HOME_SLOTS)):
+                nm = slots[i] if i < len(slots) else None
+                if nm in REGISTRY and nm not in seen:
+                    clean.append(nm); seen.add(nm)
+                else:
+                    clean.append(None)
+            LAYOUT_PATH.write_text(json.dumps({"slots": clean}, indent=2) + "\n")
+            self._send(200, b"saved", "text/plain")
             return
         if self.path == "/marquee":
             from pathlib import Path
