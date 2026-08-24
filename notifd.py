@@ -69,6 +69,28 @@ def friendly_app(app: str) -> str:
     return tail.upper()[:12] if tail else "ALERT"
 
 
+# recognisable brand-ish colours for common apps; everything else gets a
+# stable colour derived from its name so each source looks distinct.
+APP_COLORS = {
+    "SLACK": [240, 120, 0], "MAIL": [0, 90, 240], "MESSAGES": [0, 200, 60],
+    "CALENDAR": [220, 0, 40], "REMINDERS": [255, 140, 0], "WHATSAPP": [0, 200, 90],
+    "TELEGRAM": [0, 160, 230], "DISCORD": [110, 100, 240], "ZOOM": [0, 120, 255],
+    "TEAMS": [90, 80, 220], "OUTLOOK": [0, 100, 210], "SPOTIFY": [0, 210, 90],
+    "MUSIC": [250, 60, 90], "FACETIME": [0, 200, 70], "NOTES": [230, 200, 0],
+}
+
+
+def app_color(app: str) -> list[int]:
+    import colorsys
+
+    name = friendly_app(app)
+    if name in APP_COLORS:
+        return list(APP_COLORS[name])
+    h = (sum(ord(c) * (i + 1) for i, c in enumerate(name)) % 360) / 360.0
+    r, g, b = colorsys.hsv_to_rgb(h, 0.85, 1.0)
+    return [int(r * 255), int(g * 255), int(b * 255)]
+
+
 def log(msg: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
 
@@ -140,8 +162,10 @@ class NotifyService:
                 return "all(cooldown)"
             self.last_fired["__all__"] = now
             d["name"] = "all"
+            color = app_color(app)                 # a distinct colour per source
+            d["color"] = color
             self.fire(d)
-            self._notify_ui(app, title, body, d.get("color", [0, 150, 255]))
+            self._notify_ui(app, title, body, color)
             log(f"notification: {app!r} -> show-all")
             return "all"
         return None

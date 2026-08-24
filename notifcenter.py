@@ -63,6 +63,7 @@ class NotifCenter:
                 return
             n = self.queue[0]
             cols = self.cols
+            queue_colors = [q["color"] for q in self.queue]
         color = n["color"]
         screen.clear(tuple(c // 10 for c in color))          # dim tint bg
 
@@ -82,9 +83,12 @@ class NotifCenter:
                     if bits[r]:
                         screen.set(sx, 3 + r, (255, 255, 255))
 
-        # top row: unread-count dots in the source colour
-        for i in range(min(self.unread(), W)):
-            screen.set(i, 0, color)
+        # top row: one dot per queued alert, each in its own source colour,
+        # so you can glance and see what's waiting; the current one blinks
+        blink = int(now * 3) % 2
+        for i, qc in enumerate(queue_colors[:W]):
+            c = (255, 255, 255) if (i == 0 and blink) else qc
+            screen.set(i, 0, c)
 
         # side borders (rows 1..9) mark the alert colour
         for y in range(1, 10):
