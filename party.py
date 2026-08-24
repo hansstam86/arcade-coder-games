@@ -38,6 +38,8 @@ DEFAULT = {
     "bands_hz": [60, 5000],        # log-spaced range across the 12 columns
     "gain_decay": 0.995,           # auto-gain: rolling max decay per frame
     "fall_rows_per_frame": 0.55,   # how fast columns fall
+    "palette": "rainbow",          # "rainbow" (animated per-band hue) or "heat"
+    "rainbow_speed": 0.06,         # hue rotations per second
 }
 
 SAMPLE_RATE = 48000
@@ -48,14 +50,31 @@ def log(msg: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
-def column_color(row_from_bottom: int) -> tuple[int, int, int]:
-    """green -> yellow -> orange -> red gradient going up."""
+import colorsys
+
+
+def heat_color(row_from_bottom: int) -> tuple[int, int, int]:
+    """green -> yellow -> orange -> red gradient going up (classic VU)."""
     t = row_from_bottom / 11.0
     if t < 0.5:
         k = t / 0.5
         return (int(255 * k), 220, 0)
     k = (t - 0.5) / 0.5
     return (255, int(220 * (1 - k)), 0)
+
+
+def rainbow_color(col: int, row_from_bottom: int, phase: float) -> tuple[int, int, int]:
+    """Each column its own hue (a full rainbow across the 12 bands), slowly
+    rotating over time; higher cells are brighter and a touch more saturated."""
+    hue = (col / 12.0 + phase) % 1.0
+    v = 0.45 + 0.55 * (row_from_bottom / 11.0)
+    r, g, b = colorsys.hsv_to_rgb(hue, 1.0, v)
+    return (int(r * 255), int(g * 255), int(b * 255))
+
+
+# kept for backward-compat / other callers
+def column_color(row_from_bottom: int) -> tuple[int, int, int]:
+    return heat_color(row_from_bottom)
 
 
 class Party(Game):
@@ -254,16 +273,26 @@ class Party(Game):
         self.bass = 0.75 * self.bass + 0.25 * min(1.0, (bands[0] + bands[1]) / (2 * self.gain))
 
     def draw(self, screen):
-        b = int(14 * self.bass)
-        screen.clear((b, 0, b // 2))               # bass-driven purple pulse
+        now = time.monotonic()
+        rainbow = self.cfg.get("palette", "rainbow") == "rainbow"
+        phase = now * self.cfg.get("rainbow_speed", 0.06)
+        if rainbow:                                # bass pulse cycles hue too
+            import colorsys
+            hr, hg, hb = colorsys.hsv_to_rgb(phase % 1.0, 1.0, 1.0)
+            b = self.bass
+            screen.clear((int(16 * b * hr), int(16 * b * hg), int(16 * b * hb)))
+        else:
+            b = int(14 * self.bass)
+            screen.clear((b, 0, b // 2))           # bass-driven purple pulse
         for col in range(12):
             h = self.levels[col]
             for row in range(int(round(h))):
                 if row < 12:
-                    screen.set(col, 11 - row, column_color(row))
+                    color = rainbow_color(col, row, phase) if rainbow else heat_color(row)
+                    screen.set(col, 11 - row, color)
             pk = int(round(self.peaks[col]))
             if pk >= 1:
-                screen.set(col, max(0, 12 - pk), (230, 230, 230))
+                screen.set(col, max(0, 12 - pk), (255, 255, 255))
         if self.active_source is None and int(time.monotonic() * 2) % 2:
             for x, y in ((0, 0), (11, 0)):
                 screen.set(x, y, (120, 0, 0))
