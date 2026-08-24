@@ -251,33 +251,44 @@ class NotifyService:
                 px = screen.px[i]
                 screen.px[i] = tuple(int(px[c] * (1 - a) + color[c] * a) for c in range(3))
 
-    # -- Notification Center poller ------------------------------------------
+    # -- Notification Center reader (via the FDA-granted ncread_helper) -------
     def _nc_poller(self) -> None:
-        last_seen = time.time() - 978307200.0     # Cocoa epoch offset: start now
+        helper = ROOT / "ncread_helper"
+        if not helper.exists():
+            self.nc_status = "ncread_helper missing (swiftc -O ncread.swift -o ncread_helper -lsqlite3)"
+            return
+        import subprocess
+
         while True:
             try:
-                con = sqlite3.connect(f"file:{NC_DB}?mode=ro", uri=True, timeout=1.0)
-                rows = con.execute(
-                    "SELECT a.identifier, r.delivered_date, r.data "
-                    "FROM record r JOIN app a ON r.app_id = a.app_id "
-                    "WHERE r.delivered_date > ? ORDER BY r.delivered_date LIMIT 20",
-                    (last_seen,)).fetchall()
-                con.close()
-                self.nc_status = "ok"
-                for identifier, delivered, blob in rows:
-                    last_seen = max(last_seen, delivered)
-                    title = body = ""
-                    try:
-                        d = plistlib.loads(blob)
-                        req = d.get("req", {})
-                        title = req.get("titl", "") or ""
-                        body = req.get("body", "") or ""
-                    except Exception:
-                        pass
-                    self.handle(identifier or "", title, body)
-            except Exception as exc:  # noqa: BLE001
-                self.nc_status = f"no access ({type(exc).__name__}) — use the webhook, or grant Full Disk Access to ArcadeMinesweeper"
-            time.sleep(2.0)
+                proc = subprocess.Popen([str(helper)], stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE)
+            except OSError as exc:
+                self.nc_status = f"helper failed to launch: {exc}"
+                time.sleep(5.0)
+                continue
+            # watch stderr for the access status
+            def watch_err(p=proc):
+                for line in iter(p.stderr.readline, b""):
+                    txt = line.decode(errors="replace").strip()
+                    if "watching" in txt:
+                        self.nc_status = "ok"
+                    elif "Full Disk Access" in txt or "denied" in txt:
+                        self.nc_status = ("no access — grant Full Disk Access to "
+                                          "ncread_helper in System Settings")
+            threading.Thread(target=watch_err, daemon=True).start()
+            for line in iter(proc.stdout.readline, b""):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                    self.nc_status = "ok"
+                    self.handle(obj.get("app", ""), obj.get("title", ""), obj.get("body", ""))
+                except Exception:
+                    pass
+            proc.wait()
+            time.sleep(3.0)     # helper exited (e.g. no FDA yet) — retry
 
 
 SERVICE: NotifyService | None = None
