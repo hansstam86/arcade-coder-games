@@ -160,7 +160,8 @@ class ArcadeOS(Game):
             self.enter(name)
         if self.app is not None:
             self.app.update(dt)
-        if (self.app_name not in ("home", "ambient")
+        if (self.cfg["idle_minutes"] > 0            # 0 = auto-ambient disabled
+                and self.app_name not in ("home", "ambient")
                 and not self.auto_ambient_from
                 and not getattr(self.app, "busy", False)
                 and now - self.last_press > self.cfg["idle_minutes"] * 60):
