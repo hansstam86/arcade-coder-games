@@ -46,7 +46,10 @@ DEFAULT = {"idle_minutes": 10, "corner_taps": 3, "corner_window": 1.5,
            # dedicated Mac-volume pads: bottom-left = down, bottom-right = up.
            # Active in idle/ambient, equalizer, home, and the notification
            # center (set "everywhere" to also override games/deck/etc.).
-           "volume_pads": True, "volume_step": 6, "volume_everywhere": False}
+           "volume_pads": True, "volume_step": 6, "volume_everywhere": False,
+           # app-cycle pads: top-left = previous app, top-right = next app,
+           # cycling through home + every app. Always on.
+           "nav_pads": True}
 
 APPS = [
     # (name, class, icon quad colours [tl, tr, bl, br], position) — 3x3 grid
@@ -180,6 +183,8 @@ class ArcadeOS(Game):
 
     VOL_DOWN = (0, 11)
     VOL_UP = (11, 11)
+    APP_PREV = (0, 0)
+    APP_NEXT = (11, 0)
 
     def _volume_active(self) -> bool:
         if self.volume is None:
@@ -188,6 +193,19 @@ class ArcadeOS(Game):
             return True
         # active where a press isn't otherwise doing interactive work
         return self.in_center or self.app_name in ("home", "ambient", "party")
+
+    def _cycle_order(self):
+        return ["home"] + [name for name, *_ in APPS]
+
+    def _cycle_app(self, delta: int) -> None:
+        order = self._cycle_order()
+        try:
+            i = order.index(self.app_name)
+        except ValueError:
+            i = 0
+        self.auto_ambient_from = None
+        self.marquee_return_at = 0.0
+        self.enter(order[(i + delta) % len(order)])
 
     # -- input ---------------------------------------------------------------
     def on_press(self, x, y):
@@ -199,19 +217,13 @@ class ArcadeOS(Game):
             self.vol_level = self.volume.change(step if (x, y) == self.VOL_UP else -step)
             self.vol_shown_until = now + 1.2
             return
+        # app-cycle pads (top corners) — always, except while dismissing alerts
+        if self.cfg.get("nav_pads") and not self.in_center and (x, y) in (self.APP_PREV, self.APP_NEXT):
+            self._cycle_app(1 if (x, y) == self.APP_NEXT else -1)
+            return
         if self.in_center:                          # a press marks the alert read
             self.center.press(x, y)
             return
-        # hot corner: N taps on (0,0) within the window -> home
-        if (x, y) == (0, 0) and self.app_name != "home":
-            self.corner_taps = [t for t in self.corner_taps if now - t < self.cfg["corner_window"]]
-            self.corner_taps.append(now)
-            if len(self.corner_taps) >= self.cfg["corner_taps"]:
-                self.corner_taps = []
-                self.enter("home")
-                return
-        else:
-            self.corner_taps = []
         if self.auto_ambient_from:                     # wake from auto-ambient
             back = self.auto_ambient_from
             self.auto_ambient_from = None
@@ -306,6 +318,9 @@ class ArcadeOS(Game):
             if self.notify:
                 self.notify.draw_overlay(screen, now)
         self._draw_volume(screen, now)              # dedicated volume pads on top
+        if self.cfg.get("nav_pads"):                # app prev/next pads (top corners)
+            screen.set(*self.APP_PREV, (180, 60, 220))   # ‹ prev (purple)
+            screen.set(*self.APP_NEXT, (180, 60, 220))   # › next
         if self.pixoo:
             self.pixoo.set_board_frame(screen.px)
 
