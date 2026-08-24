@@ -8,11 +8,12 @@ board flashes and the next one begins automatically.
 
 Controls (press):
   centre / most of the board .... start / pause
+  top-right button (amber) ...... cycle the interval preset (25/5, 50/10, ...)
   bottom-left button (blue) ..... reset the current interval
   bottom-right button (white) ... skip to the next interval
 
 Config in pomodoro.json (auto-created):
-  work_min, short_break_min, long_break_min, rounds (long break every Nth),
+  presets (list of {name, work, short, long, rounds}), preset (chosen index),
   auto_start (roll straight into the next interval when one ends)
 
   python pomodoro.py          # emulator
@@ -30,11 +31,16 @@ from arcadecoder import Game, run
 
 CONFIG_PATH = Path(__file__).resolve().parent / "pomodoro.json"
 
+PRESETS = [
+    {"name": "classic",   "work": 25, "short": 5,  "long": 15, "rounds": 4},
+    {"name": "deep",      "work": 50, "short": 10, "long": 30, "rounds": 4},
+    {"name": "short",     "work": 15, "short": 3,  "long": 15, "rounds": 4},
+    {"name": "ultradian", "work": 90, "short": 20, "long": 30, "rounds": 2},
+]
+
 DEFAULT = {
-    "work_min": 25,
-    "short_break_min": 5,
-    "long_break_min": 15,
-    "rounds": 4,          # a long break after every `rounds` work sessions
+    "presets": PRESETS,
+    "preset": 0,          # index of the active preset (cycled on-device)
     "auto_start": True,   # begin the next interval automatically
 }
 
@@ -58,6 +64,7 @@ PHASES = {
     "long":  ((0, 130, 255),  (2, 14, 40)),
 }
 
+PRESET_BTN = (10, 1)
 RESET_BTN = (1, 10)
 SKIP_BTN = (10, 10)
 
@@ -84,6 +91,9 @@ class Pomodoro(Game):
                 self.cfg.update(json.loads(CONFIG_PATH.read_text()))
             except Exception:
                 pass
+        self.presets = self.cfg.get("presets") or PRESETS
+        self.preset_idx = max(0, min(len(self.presets) - 1,
+                                     int(self.cfg.get("preset", 0))))
         self.completed = 0            # finished work sessions
         self.phase = "work"
         self.total = self._duration("work")
@@ -92,13 +102,31 @@ class Pomodoro(Game):
         self.busy = False             # true while counting -> block auto-ambient
         self.flash_until = 0.0        # phase-change celebration
         self.last = time.monotonic()
-        log(f"pomodoro ready — {self.cfg['work_min']} min work, press to start")
+        log(f"pomodoro ready — preset '{self._preset()['name']}' "
+            f"({self._preset()['work']} min work), press to start")
 
     # -- timer model ---------------------------------------------------------
+    def _preset(self) -> dict:
+        return self.presets[self.preset_idx]
+
     def _duration(self, phase: str) -> int:
-        key = {"work": "work_min", "short": "short_break_min",
-               "long": "long_break_min"}[phase]
-        return max(1, int(self.cfg[key])) * 60
+        key = {"work": "work", "short": "short", "long": "long"}[phase]
+        return max(1, int(self._preset()[key])) * 60
+
+    def _rounds(self) -> int:
+        return max(1, int(self._preset().get("rounds", 4)))
+
+    def _cycle_preset(self) -> None:
+        self.preset_idx = (self.preset_idx + 1) % len(self.presets)
+        self.cfg["preset"] = self.preset_idx
+        self._load_phase("work", False)     # restart at the new work length
+        self.completed = 0
+        try:
+            CONFIG_PATH.write_text(json.dumps(self.cfg, indent=2) + "\n")
+        except Exception:
+            pass
+        log(f"pomodoro preset -> {self._preset()['name']} "
+            f"({self._preset()['work']}/{self._preset()['short']})")
 
     def _load_phase(self, phase: str, run_it: bool) -> None:
         self.phase = phase
@@ -110,7 +138,7 @@ class Pomodoro(Game):
         """Move to the next interval when the current one hits zero."""
         if self.phase == "work":
             self.completed += 1
-            nxt = "long" if self.completed % self.cfg["rounds"] == 0 else "short"
+            nxt = "long" if self.completed % self._rounds() == 0 else "short"
         else:
             nxt = "work"
         self.flash_until = time.monotonic() + 2.5
@@ -120,6 +148,9 @@ class Pomodoro(Game):
 
     # -- input ---------------------------------------------------------------
     def on_press(self, x, y):
+        if (x, y) == PRESET_BTN:
+            self._cycle_preset()
+            return
         if (x, y) == RESET_BTN:
             self._load_phase(self.phase, False)
             log("pomodoro reset")
@@ -129,7 +160,7 @@ class Pomodoro(Game):
             if self.phase == "work":
                 self.completed += 1
             nxt = ("long" if self.phase == "work"
-                   and self.completed % self.cfg["rounds"] == 0
+                   and self.completed % self._rounds() == 0
                    else "short" if self.phase == "work" else "work")
             self._load_phase(nxt, False)
             log(f"pomodoro skip -> {self.phase}")
@@ -189,6 +220,7 @@ class Pomodoro(Game):
         self._buttons(screen)
 
     def _buttons(self, screen) -> None:
+        screen.set(*PRESET_BTN, (255, 180, 0))   # cycle preset (amber)
         screen.set(*RESET_BTN, (40, 90, 200))    # reset (blue)
         screen.set(*SKIP_BTN, (200, 200, 200))   # skip (white)
 
