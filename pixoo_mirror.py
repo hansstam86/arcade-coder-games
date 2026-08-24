@@ -1,38 +1,31 @@
-"""Mirror the Arcade Coder's 12x12 display onto a Divoom Pixoo (16x16) over BLE.
+"""Mirror the Arcade Coder's 12x12 display onto a paired Divoom Pixoo (16x16).
 
-Runs its own asyncio loop in a background thread, holds a persistent Pixoo
-connection (reconnecting as needed), and sends the latest board frame scaled
-to 16x16 — paced for Bluetooth. The Pixoo must be in "app mode" (not its
-standalone clock) to accept image data.
-
-ArcadeOS pushes each rendered board frame via set_board_frame(); everything
-else is decoupled so the board is never blocked by the Pixoo link.
+The Pixoo is driven over its Bluetooth serial port (see pixoo.py). A background
+thread opens the port, then streams the latest board frame scaled to 16x16,
+BLE-paced and colour-reduced so each image is small. If the port isn't present
+(Pixoo not paired) it retries quietly; the board is never blocked.
 """
 
 from __future__ import annotations
 
-import asyncio
 import threading
 import time
 
-from pixoo import Pixoo, SIZE  # SIZE = 16
+from pixoo import Pixoo, SIZE, find_port
 
 BOARD = 12
 
 
 def scale_12_to_16(px12):
-    """Nearest-neighbour upscale of a 144-list of (r,g,b) to a 256-list."""
     out = []
     for oy in range(SIZE):
-        sy = oy * BOARD // SIZE
-        row = sy * BOARD
+        row = (oy * BOARD // SIZE) * BOARD
         for ox in range(SIZE):
             out.append(px12[row + (ox * BOARD // SIZE)])
     return out
 
 
-def quantize(pixels, levels=6):
-    """Reduce colour depth so busy frames keep a small palette (faster BLE)."""
+def quantize(pixels, levels=4):
     step = 255 // (levels - 1)
     return [tuple(round(c / step) * step for c in p) for p in pixels]
 
@@ -46,7 +39,7 @@ class PixooMirror:
         self.brightness = brightness
         self.min_interval = 1.0 / max(1, fps)
         self.quant_levels = quant_levels
-        self.max_colors = max_colors     # keep the BLE image small enough to arrive
+        self.max_colors = max_colors
         threading.Thread(target=self._run, daemon=True).start()
 
     def set_board_frame(self, px12) -> None:
@@ -55,42 +48,36 @@ class PixooMirror:
             self._frame = frame
 
     def _run(self) -> None:
-        try:
-            asyncio.run(self._loop())
-        except Exception:
-            pass
-
-    async def _loop(self) -> None:
         while not self._stop:
+            if find_port() is None:
+                self.connected = False
+                time.sleep(3.0)
+                continue
             px = Pixoo()
+            if not px.open():
+                time.sleep(3.0)
+                continue
+            self.connected = True
             try:
-                await px.connect()
-                self.connected = True
-                try:
-                    await px.brightness(self.brightness)
-                except Exception:
-                    pass
-                last = None
-                while not self._stop and px.client and px.client.is_connected:
-                    t0 = time.monotonic()
-                    with self._lock:
-                        frame = self._frame
-                    if frame is not None and frame != last:
-                        try:
-                            await px.image(frame, max_colors=self.max_colors)
-                            last = frame
-                        except Exception:
-                            break
-                    await asyncio.sleep(max(0.0, self.min_interval - (time.monotonic() - t0)))
+                px.brightness(self.brightness)
             except Exception:
                 pass
+            last = None
+            while not self._stop:
+                t0 = time.monotonic()
+                with self._lock:
+                    frame = self._frame
+                if frame is not None and frame != last:
+                    try:
+                        px.image(frame, max_colors=self.max_colors)
+                        last = frame
+                    except Exception:
+                        break
+                time.sleep(max(0.0, self.min_interval - (time.monotonic() - t0)))
             self.connected = False
-            try:
-                await px.disconnect()
-            except Exception:
-                pass
+            px.close()
             if not self._stop:
-                await asyncio.sleep(5)
+                time.sleep(2.0)
 
     def stop(self) -> None:
         self._stop = True

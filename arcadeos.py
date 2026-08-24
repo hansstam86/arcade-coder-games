@@ -114,7 +114,7 @@ class ArcadeOS(Game):
                 from pixoo_mirror import PixooMirror
 
                 self.pixoo = PixooMirror()
-                log("pixoo mirror started (put the Pixoo in app mode)")
+                log("pixoo mirror started (mirroring board -> /dev/cu.Pixoo)")
             except Exception as exc:  # noqa: BLE001
                 log(f"pixoo mirror failed: {exc!r}")
         log("ArcadeOS home — press an icon: " + " ".join(n for n, *_ in APPS))

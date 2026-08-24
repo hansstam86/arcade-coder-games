@@ -142,6 +142,16 @@ echo arcadeos_hw.py > launch_target.txt && open ArcadeMinesweeper.app
 scripts/install_login.sh    # optional: start ArcadeOS at login
 ```
 
+## Pixoo mirror
+
+Mirror the board onto a paired **Divoom Pixoo 16**. On macOS the Pixoo 16 is
+driven over its Bluetooth *serial* port (Classic SPP), not BLE: pair it in
+System Settings so `/dev/cu.Pixoo` appears, then set `pixoo_mirror: true` in
+`arcadeos.json`. Whatever the board shows plays on the Pixoo, scaled 12->16
+(colour-reduced and paced for the link). `pixoo.py` is a standalone driver
+too (image/brightness/solid-colour). Image encoding matches
+jvandenbos/pixoo-python and virtualabs/pixoo-client.
+
 ## Scrolling marquee
 
 [marquee.py](marquee.py): a scrolling-text display in a 3×5 pixel font
