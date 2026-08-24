@@ -189,8 +189,8 @@ class ArcadeOS(Game):
     VOL_UP = (11, 11)
     APP_PREV = (0, 0)
     APP_NEXT = (11, 0)
-    MAC_PREV = (1, 0)
-    MAC_NEXT = (10, 0)
+    MAC_PREV = (0, 2)     # 2 rows below the arcade-nav corners
+    MAC_NEXT = (11, 2)
 
     def _volume_active(self) -> bool:
         if self.volume is None:
@@ -332,7 +332,7 @@ class ArcadeOS(Game):
         if self.cfg.get("nav_pads"):                # arcade app prev/next (top corners)
             screen.set(*self.APP_PREV, (180, 60, 220))   # ‹ prev (purple)
             screen.set(*self.APP_NEXT, (180, 60, 220))   # › next
-        if self.cfg.get("mac_nav_pads"):            # mac app prev/next (top edge, inside)
+        if self.cfg.get("mac_nav_pads"):            # mac app prev/next (2 rows below nav)
             screen.set(*self.MAC_PREV, (255, 120, 0))    # ‹ mac prev (orange)
             screen.set(*self.MAC_NEXT, (255, 120, 0))    # › mac next
         if self.pixoo:
