@@ -30,3 +30,22 @@ class Volume:
         self.level = max(0, min(100, self.level + delta))
         threading.Thread(target=self._apply, args=(self.level,), daemon=True).start()
         return self.level
+
+
+def read_muted() -> bool:
+    try:
+        out = subprocess.run(
+            ["osascript", "-e", "output muted of (get volume settings)"],
+            capture_output=True, text=True, timeout=2)
+        return out.stdout.strip() == "true"
+    except Exception:
+        return False
+
+
+def set_muted(value: bool) -> None:
+    val = "true" if value else "false"
+    try:
+        subprocess.Popen(["osascript", "-e", f"set volume output muted {val}"],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass

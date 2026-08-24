@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -137,12 +138,15 @@ class ArcadeOS(Game):
         self.volume = None                # dedicated Mac-volume pads
         self.vol_shown_until = 0.0
         self.vol_level = 0
+        self.muted = False                # dedicated mute pad (middle of bottom row)
         if self.cfg.get("volume_pads"):
             try:
-                from volume import Volume
+                from volume import Volume, read_muted
 
                 self.volume = Volume()
                 self.vol_level = self.volume.level
+                self.muted = read_muted()
+                threading.Thread(target=self._mute_poll_loop, daemon=True).start()
             except Exception as exc:  # noqa: BLE001
                 log(f"volume pads unavailable: {exc!r}")
         try:
@@ -204,12 +208,20 @@ class ArcadeOS(Game):
 
     VOL_DOWN = (0, 11)
     VOL_UP = (11, 11)
+    MUTE_PAD = (6, 11)    # dedicated mute, middle of the bottom row
     APP_PREV = (0, 0)
     APP_NEXT = (11, 0)
     MAC_PREV = (0, 2)     # 2 rows below the arcade-nav corners
     MAC_NEXT = (11, 2)
     FF_PREV = (0, 4)      # 2 rows below the mac pads
     FF_NEXT = (11, 4)
+
+    def _mute_poll_loop(self) -> None:
+        from volume import read_muted
+        while True:
+            if self._volume_active():
+                self.muted = read_muted()
+            time.sleep(1.5)
 
     def _volume_active(self) -> bool:
         if self.volume is None:
@@ -240,6 +252,13 @@ class ArcadeOS(Game):
         if self._volume_active() and (x, y) in (self.VOL_DOWN, self.VOL_UP):
             step = self.cfg.get("volume_step", 6)
             self.vol_level = self.volume.change(step if (x, y) == self.VOL_UP else -step)
+            self.vol_shown_until = now + 1.2
+            return
+        # dedicated mute pad (middle of the bottom row)
+        if self._volume_active() and (x, y) == self.MUTE_PAD:
+            from volume import set_muted
+            self.muted = not self.muted
+            set_muted(self.muted)
             self.vol_shown_until = now + 1.2
             return
         # app-cycle pads (top corners) — always, except while dismissing alerts
@@ -372,6 +391,8 @@ class ArcadeOS(Game):
         ux, uy = self.VOL_UP
         screen.set(dx, dy, (0, 120, 255))           # always lit − (blue)
         screen.set(ux, uy, (0, 230, 80))            # always lit + (green)
+        mx, my = self.MUTE_PAD                      # always lit mute (red when muted)
+        screen.set(mx, my, (220, 0, 0) if self.muted else (0, 150, 170))
         if now < self.vol_shown_until:              # feedback bar after a press
             lit = round(self.vol_level / 100 * 12)
             for x in range(12):
