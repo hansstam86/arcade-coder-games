@@ -9,6 +9,8 @@
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleExecutable</key><string>ArcadeMinesweeper</string>
     <key>LSUIElement</key><true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Captures audio (e.g. the EP-133's USB audio) so the board can visualize sound.</string>
     <key>NSBluetoothAlwaysUsageDescription</key>
     <string>Connects to the Arcade Coder LED board over Bluetooth to play Minesweeper.</string>
 </dict>

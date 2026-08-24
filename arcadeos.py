@@ -33,6 +33,7 @@ from seq import Sequencer
 from midiviz import MidiViz
 from rhythm import Rhythm
 from ambient import Ambient
+from party import Party
 
 CONFIG_PATH = Path(__file__).resolve().parent / "arcadeos.json"
 
@@ -47,6 +48,7 @@ APPS = [
     ("midiviz", MidiViz, [(200, 0, 180), (0, 190, 190), (0, 190, 190), (200, 0, 180)], (1, 7)),
     ("rhythm", Rhythm, [(200, 0, 60), (220, 200, 0), (220, 200, 0), (200, 0, 60)], (4, 7)),
     ("ambient", Ambient, [(0, 40, 120), (0, 60, 160), (0, 60, 160), (0, 40, 120)], (7, 7)),
+    ("party", Party, [(0, 220, 0), (255, 220, 0), (255, 60, 0), (180, 0, 255)], (10, 7)),
 ]
 APP_BY_NAME = {name: cls for name, cls, _i, _p in APPS}
 
