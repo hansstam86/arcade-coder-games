@@ -36,6 +36,7 @@ from ambient import Ambient
 from party import Party
 from marquee import Marquee
 import macapps
+import firefox
 
 CONFIG_PATH = Path(__file__).resolve().parent / "arcadeos.json"
 
@@ -53,7 +54,9 @@ DEFAULT = {"idle_minutes": 10, "corner_taps": 3, "corner_window": 1.5,
            "nav_pads": True,
            # mac-app switch pads (like Cmd-Tab): top edge inside the nav pads.
            # Needs Accessibility permission (macOS prompts on first use).
-           "mac_nav_pads": True}
+           "mac_nav_pads": True,
+           # firefox tab-switch pads (side edges, below the mac pads).
+           "firefox_tab_pads": True}
 
 APPS = [
     # (name, class, icon quad colours [tl, tr, bl, br], position) — 3x3 grid
@@ -191,6 +194,8 @@ class ArcadeOS(Game):
     APP_NEXT = (11, 0)
     MAC_PREV = (0, 2)     # 2 rows below the arcade-nav corners
     MAC_NEXT = (11, 2)
+    FF_PREV = (0, 4)      # 2 rows below the mac pads
+    FF_NEXT = (11, 4)
 
     def _volume_active(self) -> bool:
         if self.volume is None:
@@ -231,6 +236,11 @@ class ArcadeOS(Game):
         if self.cfg.get("mac_nav_pads") and not self.in_center and (x, y) in (self.MAC_PREV, self.MAC_NEXT):
             macapps.switch(1 if (x, y) == self.MAC_NEXT else -1)
             self.vol_shown_until = now + 0.6      # brief flash on the pad
+            return
+        # firefox tab-switch pads (side edges) — like Cmd-Option-Arrow
+        if self.cfg.get("firefox_tab_pads") and not self.in_center and (x, y) in (self.FF_PREV, self.FF_NEXT):
+            firefox.switch_tab(1 if (x, y) == self.FF_NEXT else -1)
+            self.vol_shown_until = now + 0.6
             return
         if self.in_center:                          # a press marks the alert read
             self.center.press(x, y)
@@ -335,6 +345,9 @@ class ArcadeOS(Game):
         if self.cfg.get("mac_nav_pads"):            # mac app prev/next (2 rows below nav)
             screen.set(*self.MAC_PREV, (255, 120, 0))    # ‹ mac prev (orange)
             screen.set(*self.MAC_NEXT, (255, 120, 0))    # › mac next
+        if self.cfg.get("firefox_tab_pads"):        # firefox tab prev/next (2 rows below mac)
+            screen.set(*self.FF_PREV, (0, 200, 220))     # ‹ tab prev (cyan)
+            screen.set(*self.FF_NEXT, (0, 200, 220))     # › tab next
         if self.pixoo:
             self.pixoo.set_board_frame(screen.px)
 
