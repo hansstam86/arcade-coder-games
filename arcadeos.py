@@ -314,8 +314,8 @@ class ArcadeOS(Game):
             return
         dx, dy = self.VOL_DOWN
         ux, uy = self.VOL_UP
-        screen.set(dx, dy, (0, 40, 80))             # subtle − marker (blue)
-        screen.set(ux, uy, (0, 80, 20))             # subtle + marker (green)
+        screen.set(dx, dy, (0, 120, 255))           # always lit − (blue)
+        screen.set(ux, uy, (0, 230, 80))            # always lit + (green)
         if now < self.vol_shown_until:              # feedback bar after a press
             lit = round(self.vol_level / 100 * 12)
             for x in range(12):
@@ -324,8 +324,8 @@ class ArcadeOS(Game):
                     screen.set(x, 10, (0, g, 40))
                 else:
                     screen.set(x, 10, (10, 10, 14))
-            screen.set(dx, dy, (0, 120, 255))       # brighten the pressed controls
-            screen.set(ux, uy, (0, 255, 90))
+            screen.set(dx, dy, (120, 200, 255))     # flash brighter on press
+            screen.set(ux, uy, (150, 255, 150))
 
 
 if __name__ == "__main__":
