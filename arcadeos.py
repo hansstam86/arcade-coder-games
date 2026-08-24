@@ -35,6 +35,7 @@ from rhythm import Rhythm
 from ambient import Ambient
 from party import Party
 from marquee import Marquee
+import macapps
 
 CONFIG_PATH = Path(__file__).resolve().parent / "arcadeos.json"
 
@@ -49,7 +50,10 @@ DEFAULT = {"idle_minutes": 10, "corner_taps": 3, "corner_window": 1.5,
            "volume_pads": True, "volume_step": 6, "volume_everywhere": False,
            # app-cycle pads: top-left = previous app, top-right = next app,
            # cycling through home + every app. Always on.
-           "nav_pads": True}
+           "nav_pads": True,
+           # mac-app switch pads (like Cmd-Tab): top edge inside the nav pads.
+           # Needs Accessibility permission (macOS prompts on first use).
+           "mac_nav_pads": True}
 
 APPS = [
     # (name, class, icon quad colours [tl, tr, bl, br], position) — 3x3 grid
@@ -185,6 +189,8 @@ class ArcadeOS(Game):
     VOL_UP = (11, 11)
     APP_PREV = (0, 0)
     APP_NEXT = (11, 0)
+    MAC_PREV = (1, 0)
+    MAC_NEXT = (10, 0)
 
     def _volume_active(self) -> bool:
         if self.volume is None:
@@ -220,6 +226,11 @@ class ArcadeOS(Game):
         # app-cycle pads (top corners) — always, except while dismissing alerts
         if self.cfg.get("nav_pads") and not self.in_center and (x, y) in (self.APP_PREV, self.APP_NEXT):
             self._cycle_app(1 if (x, y) == self.APP_NEXT else -1)
+            return
+        # mac-app switch pads (top edge, inside the nav pads) — like Cmd-Tab
+        if self.cfg.get("mac_nav_pads") and not self.in_center and (x, y) in (self.MAC_PREV, self.MAC_NEXT):
+            macapps.switch(1 if (x, y) == self.MAC_NEXT else -1)
+            self.vol_shown_until = now + 0.6      # brief flash on the pad
             return
         if self.in_center:                          # a press marks the alert read
             self.center.press(x, y)
@@ -318,9 +329,12 @@ class ArcadeOS(Game):
             if self.notify:
                 self.notify.draw_overlay(screen, now)
         self._draw_volume(screen, now)              # dedicated volume pads on top
-        if self.cfg.get("nav_pads"):                # app prev/next pads (top corners)
+        if self.cfg.get("nav_pads"):                # arcade app prev/next (top corners)
             screen.set(*self.APP_PREV, (180, 60, 220))   # ‹ prev (purple)
             screen.set(*self.APP_NEXT, (180, 60, 220))   # › next
+        if self.cfg.get("mac_nav_pads"):            # mac app prev/next (top edge, inside)
+            screen.set(*self.MAC_PREV, (255, 120, 0))    # ‹ mac prev (orange)
+            screen.set(*self.MAC_NEXT, (255, 120, 0))    # › mac next
         if self.pixoo:
             self.pixoo.set_board_frame(screen.px)
 
