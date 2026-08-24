@@ -37,6 +37,7 @@ from party import Party
 from marquee import Marquee
 from pomodoro import Pomodoro
 from countdown import Countdown
+from weather import Weather
 import macapps
 import firefox
 
@@ -73,6 +74,7 @@ APPS = [
     ("marquee", Marquee, [(0, 200, 255), (0, 120, 255), (0, 120, 255), (0, 200, 255)], (9, 7)),
     ("pomodoro", Pomodoro, [(255, 70, 40), (255, 70, 40), (0, 200, 90), (0, 200, 90)], (1, 10)),
     ("countdown", Countdown, [(235, 235, 235), (235, 235, 235), (0, 180, 220), (0, 180, 220)], (9, 10)),
+    ("weather", Weather, [(120, 200, 255), (255, 210, 0), (120, 200, 255), (180, 220, 255)], (5, 10)),
 ]
 APP_BY_NAME = {name: cls for name, cls, _i, _p in APPS}
 
