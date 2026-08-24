@@ -39,7 +39,7 @@ DEFAULT = {
     "gain_decay": 0.995,           # auto-gain: rolling max decay per frame
     "fall_rows_per_frame": 0.55,   # how fast columns fall
     "palette": "rainbow",          # "rainbow" (animated per-band hue) or "heat"
-    "rainbow_speed": 0.06,         # hue rotations per second
+    "rainbow_speed": 0.15,         # hue rotations per second
 }
 
 SAMPLE_RATE = 48000
@@ -64,11 +64,14 @@ def heat_color(row_from_bottom: int) -> tuple[int, int, int]:
 
 
 def rainbow_color(col: int, row_from_bottom: int, phase: float) -> tuple[int, int, int]:
-    """Each column its own hue (a full rainbow across the 12 bands), slowly
-    rotating over time; higher cells are brighter and a touch more saturated."""
+    """Each column its own hue (a full rainbow across the 12 bands), rotating
+    over time. Vivid: high brightness floor so even low cells glow, and the
+    top cells push toward white-hot for extra punch."""
     hue = (col / 12.0 + phase) % 1.0
-    v = 0.45 + 0.55 * (row_from_bottom / 11.0)
-    r, g, b = colorsys.hsv_to_rgb(hue, 1.0, v)
+    t = row_from_bottom / 11.0
+    v = 0.78 + 0.22 * t                 # bright everywhere, full at the top
+    s = 1.0 - 0.35 * t * t              # tips go white-hot
+    r, g, b = colorsys.hsv_to_rgb(hue, s, v)
     return (int(r * 255), int(g * 255), int(b * 255))
 
 
@@ -280,7 +283,7 @@ class Party(Game):
             import colorsys
             hr, hg, hb = colorsys.hsv_to_rgb(phase % 1.0, 1.0, 1.0)
             b = self.bass
-            screen.clear((int(16 * b * hr), int(16 * b * hg), int(16 * b * hb)))
+            screen.clear((int(40 * b * hr), int(40 * b * hg), int(40 * b * hb)))
         else:
             b = int(14 * self.bass)
             screen.clear((b, 0, b // 2))           # bass-driven purple pulse
