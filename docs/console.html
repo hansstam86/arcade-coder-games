@@ -57,6 +57,12 @@
   .bcell span { display:block; }
   .col { display:flex; flex-direction:column; gap:8px; }
   .col h3 { font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:#6b7280; margin:0; }
+  #mapPane { padding:16px; gap:16px; overflow:auto; align-items:flex-start; }
+  .mapwrap { overflow:auto; max-height:calc(100vh - 190px); border:1px solid #262a34; border-radius:8px; background:#0c0e13; }
+  .mapgrid { display:grid; grid-template-columns:repeat(48,11px); grid-auto-rows:11px; gap:0; touch-action:none; }
+  .mc { width:11px; height:11px; box-sizing:border-box; }
+  .mc.gx { border-left:1px solid #ffd16644; }
+  .mc.gy { border-top:1px solid #ffd16644; }
   .right { flex:1; display:flex; flex-direction:column; align-items:center; overflow:auto; padding:18px; gap:14px; }
   .device { background:#e8e4dc; border-radius:20px; padding:18px 18px 26px; box-shadow:0 14px 40px rgba(0,0,0,.5); }
   .grid { display:grid; grid-template-columns:repeat(12,24px); gap:4px; background:#1b1d24; padding:11px; border-radius:11px; }
@@ -93,6 +99,10 @@
     <div class="tabs">
       <div class="tab on" data-t="code">CODE</div>
       <div class="tab" data-t="sprite">SPRITE</div>
+      <div class="tab" data-t="map">MAP</div>
+      <select id="examples" title="load an example"><option value="">examples…</option>
+        <option value="mover">mover</option><option value="scroll">scroller (map)</option>
+        <option value="shapes">shapes</option></select>
     </div>
     <div class="pane on" id="codePane"><textarea id="code"></textarea></div>
     <div class="pane" id="spritePane">
@@ -105,6 +115,16 @@
         <h3>Bank</h3>
         <div class="bank" id="bank"></div>
         <p class="hint">Click a slot to edit it. Use <code>spr(n, x, y)</code> in code to stamp sprite <b>n</b> with its top-left at (x, y). The checkerboard color is transparent.</p>
+      </div>
+    </div>
+    <div class="pane" id="mapPane">
+      <div class="col" style="flex:1;min-width:0">
+        <h3>Map · 48 × 48 <span style="color:#5a6474;font-weight:400">(gold lines = 12×12 screens)</span></h3>
+        <div class="mapwrap"><div class="mapgrid" id="mapgrid"></div></div>
+      </div>
+      <div class="col">
+        <div class="palette" id="palette2"></div>
+        <p class="hint">Paint a big world. In code, <code>camera(x, y)</code> scrolls the view and <code>map()</code> draws it — move the camera for multi-screen games. <code>mget/mset(x,y)</code> read/write cells.</p>
       </div>
     </div>
   </div>
@@ -123,6 +143,8 @@ const PAL = ["#000000","#1d2b53","#7e2553","#008751","#ab5236","#5f574f","#c2c3c
 const SPR_N = 16, SPR_SZ = 8;
 let sprites = Array.from({length:SPR_N}, () => Array.from({length:SPR_SZ}, () => Array(SPR_SZ).fill(null)));
 let curSpr = 0, curColor = 8;
+const MW = 48, MH = 48;   // map is 48x48 px = 4x4 screens
+let worldmap = Array.from({length:MH}, () => Array(MW).fill(null));
 
 const DEFAULT_CODE = `# Arcade Coder — Fantasy Console
 # _init() runs once, _update() every frame, _draw() renders the 12x12 screen.
@@ -158,22 +180,86 @@ W = H = 12
 _scr = [[0]*W for _ in range(H)]
 _pressed = []
 _t0 = 0.0
+_cam = [0,0]
+_FONT = {"0":"111101101101111","1":"010110010010111","2":"111001111100111","3":"111001111001111","4":"101101111001001","5":"111100111001111","6":"111100111101111","7":"111001010010010","8":"111101111101111","9":"111101111001111","A":"010101111101101","B":"110101110101110","C":"011100100100011","D":"110101101101110","E":"111100110100111","F":"111100110100100","G":"011100101101011","H":"101101111101101","I":"111010010010111","J":"001001001101010","K":"101101110101101","L":"100100100100111","M":"101111111101101","N":"101111111111101","O":"010101101101010","P":"110101110100100","Q":"010101101110011","R":"110101110101101","S":"011100010001110","T":"111010010010010","U":"101101101101111","V":"101101101101010","W":"101101111111101","X":"101101010101101","Y":"101101010010010","Z":"111001010100111"," ":"000000000000000",":":"000010000010000","-":"000000111000000","!":"010010010000010",".":"000000000000010"}
+def camera(x=0,y=0): _cam[0]=int(x); _cam[1]=int(y)
+def _px(x,y,c):
+    if c is None: return
+    x=int(x)-_cam[0]; y=int(y)-_cam[1]
+    if 0<=x<W and 0<=y<H: _scr[y][x]=int(c)%16
 def cls(c=0):
+    _v=int(c)%16
     for _y in range(H):
-        _r = _scr[_y]
-        for _x in range(W): _r[_x] = int(c) % 16
-def pset(x,y,c):
-    x=int(x); y=int(y)
-    if c is not None and 0<=x<W and 0<=y<H: _scr[y][x] = int(c) % 16
+        _r=_scr[_y]
+        for _x in range(W): _r[_x]=_v
+def pset(x,y,c): _px(x,y,c)
 def pget(x,y):
-    x=int(x); y=int(y)
+    x=int(x)-_cam[0]; y=int(y)-_cam[1]
     return _scr[y][x] if 0<=x<W and 0<=y<H else 0
 def spr(n,x,y):
-    n=int(n); x=int(x); y=int(y)
+    n=int(n)
     if 0<=n<len(SPRITES):
         for _j,_row in enumerate(SPRITES[n]):
             for _i,_c in enumerate(_row):
-                if _c is not None: pset(x+_i, y+_j, _c)
+                if _c is not None: _px(x+_i, y+_j, _c)
+def mget(x,y):
+    x=int(x); y=int(y)
+    return MAP[y][x] if 0<=x<MW and 0<=y<MH else None
+def mset(x,y,c):
+    x=int(x); y=int(y)
+    if 0<=x<MW and 0<=y<MH: MAP[y][x]=c
+def map():
+    _cx,_cy=_cam
+    for _sy in range(H):
+        _my=_sy+_cy
+        if 0<=_my<MH:
+            _row=MAP[_my]
+            for _sx in range(W):
+                _mx=_sx+_cx
+                if 0<=_mx<MW:
+                    _c=_row[_mx]
+                    if _c is not None: _scr[_sy][_sx]=int(_c)%16
+def line(x0,y0,x1,y1,c):
+    x0=int(x0);y0=int(y0);x1=int(x1);y1=int(y1)
+    _dx=abs(x1-x0); _dy=-abs(y1-y0)
+    _sx=1 if x0<x1 else -1; _sy=1 if y0<y1 else -1
+    _e=_dx+_dy
+    while True:
+        _px(x0,y0,c)
+        if x0==x1 and y0==y1: break
+        _e2=2*_e
+        if _e2>=_dy: _e+=_dy; x0+=_sx
+        if _e2<=_dx: _e+=_dx; y0+=_sy
+def rect(x0,y0,x1,y1,c):
+    line(x0,y0,x1,y0,c); line(x0,y1,x1,y1,c); line(x0,y0,x0,y1,c); line(x1,y0,x1,y1,c)
+def rectfill(x0,y0,x1,y1,c):
+    x0=int(x0);y0=int(y0);x1=int(x1);y1=int(y1)
+    if x0>x1: x0,x1=x1,x0
+    if y0>y1: y0,y1=y1,y0
+    for _y in range(y0,y1+1):
+        for _x in range(x0,x1+1): _px(_x,_y,c)
+def circ(xc,yc,r,c):
+    xc=int(xc);yc=int(yc);r=int(r); _x=r; _y=0; _e=1-r
+    while _x>=_y:
+        for _a,_b in ((_x,_y),(_y,_x),(-_x,_y),(-_y,_x),(-_x,-_y),(-_y,-_x),(_x,-_y),(_y,-_x)):
+            _px(xc+_a,yc+_b,c)
+        _y+=1
+        if _e<0: _e+=2*_y+1
+        else: _x-=1; _e+=2*(_y-_x)+1
+def circfill(xc,yc,r,c):
+    xc=int(xc);yc=int(yc);r=int(r)
+    for _y in range(-r,r+1):
+        for _x in range(-r,r+1):
+            if _x*_x+_y*_y<=r*r: _px(xc+_x,yc+_y,c)
+def text(s,x,y,c=7):
+    x=int(x); y=int(y)
+    for _ch in str(s).upper():
+        _g=_FONT.get(_ch)
+        if _g:
+            for _r in range(5):
+                for _co in range(3):
+                    if _g[_r*3+_co]=="1": _px(x+_co,y+_r,c)
+        x+=4
 def btnp(bx=None,by=None):
     if bx is None: return _pressed[0] if _pressed else None
     return (int(bx),int(by)) in _pressed
@@ -183,11 +269,14 @@ def rnd(n=1.0): return _random.random()*n
 def flr(v): return int(_math.floor(v))
 def mid(a,b,c): return sorted((a,b,c))[1]
 def sgn(v): return -1 if v<0 else (1 if v>0 else 0)
+def sin(a): return _math.sin(a)
+def cos(a): return _math.cos(a)
+def sqrt(v): return _math.sqrt(max(0.0,v))
 class _PicoGame(Game):
     fps = 15
     def start(self):
         global _t0
-        _t0 = _time.monotonic()
+        _t0 = _time.monotonic(); _cam[0]=_cam[1]=0
         if '_init' in globals(): _init()
     def update(self, dt):
         if '_update' in globals(): _update()
@@ -222,19 +311,23 @@ document.querySelectorAll(".tab").forEach(tab=>tab.addEventListener("click",()=>
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t===tab));
   document.getElementById("codePane").classList.toggle("on",tab.dataset.t==="code");
   document.getElementById("spritePane").classList.toggle("on",tab.dataset.t==="sprite");
+  document.getElementById("mapPane").classList.toggle("on",tab.dataset.t==="map");
   if(tab.dataset.t==="code") editor.refresh();
 }));
 
 // ---- sprite editor -------------------------------------------------------
-const paletteEl=document.getElementById("palette");
-const eraser=document.createElement("div"); eraser.className="sw trans"; eraser.title="transparent";
-eraser.addEventListener("click",()=>setColor(null)); paletteEl.appendChild(eraser);
-PAL.forEach((c,i)=>{ const s=document.createElement("div"); s.className="sw"; s.style.background=c;
-  s.dataset.i=i; s.addEventListener("click",()=>setColor(i)); paletteEl.appendChild(s); });
+function buildPalette(el){
+  const er=document.createElement("div"); er.className="sw trans"; er.dataset.i="none"; er.title="transparent";
+  er.addEventListener("click",()=>setColor(null)); el.appendChild(er);
+  PAL.forEach((c,i)=>{ const s=document.createElement("div"); s.className="sw"; s.style.background=c;
+    s.dataset.i=i; s.addEventListener("click",()=>setColor(i)); el.appendChild(s); });
+}
+buildPalette(document.getElementById("palette"));
+buildPalette(document.getElementById("palette2"));
 function setColor(i){ curColor=i;
   document.querySelectorAll(".palette .sw").forEach(s=>s.classList.remove("on"));
-  if(i===null) eraser.classList.add("on");
-  else paletteEl.querySelector(`.sw[data-i="${i}"]`).classList.add("on"); }
+  const key = i===null ? "none" : String(i);
+  document.querySelectorAll(`.palette .sw[data-i="${key}"]`).forEach(s=>s.classList.add("on")); }
 const spedEl=document.getElementById("sped"), scells=[];
 let painting=false;
 for(let i=0;i<SPR_SZ*SPR_SZ;i++){ const c=document.createElement("div"); c.className="sc t";
@@ -259,17 +352,85 @@ function drawBankCell(n){ const spans=bcells[n].children;
 function renderAllBank(){ for(let n=0;n<SPR_N;n++) drawBankCell(n); }
 setColor(8);
 
+// ---- map editor ----------------------------------------------------------
+const mapgridEl=document.getElementById("mapgrid"), mcells=[];
+for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){
+  const c=document.createElement("div");
+  c.className="mc"+(x%12===0&&x>0?" gx":"")+(y%12===0&&y>0?" gy":"");
+  c.dataset.x=x; c.dataset.y=y; mapgridEl.appendChild(c); mcells.push(c);
+}
+function drawMapCell(x,y){ const el=mcells[y*MW+x], ci=worldmap[y][x];
+  el.style.background = ci===null ? "" : PAL[ci]; }
+function renderMap(){ for(let y=0;y<MH;y++) for(let x=0;x<MW;x++) drawMapCell(x,y); }
+let mpainting=false;
+function paintMap(el){ if(!el||!el.dataset||el.dataset.x===undefined) return;
+  const x=+el.dataset.x, y=+el.dataset.y; worldmap[y][x]=curColor; drawMapCell(x,y); }
+mapgridEl.addEventListener("mousedown",e=>{mpainting=true;paintMap(e.target);e.preventDefault();});
+mapgridEl.addEventListener("mousemove",e=>{if(mpainting)paintMap(e.target);});
+window.addEventListener("mouseup",()=>mpainting=false);
+
+// ---- examples ------------------------------------------------------------
+const EXAMPLES={
+mover: DEFAULT_CODE,
+scroll:`# Scroller — paint a world in the MAP tab, then explore it.
+# Tap near an edge to move the camera; gold lines mark 12x12 screens.
+FPS = 20
+
+def _init():
+    global cx, cy
+    cx, cy = 0, 0
+
+def _update():
+    global cx, cy
+    p = btnp()
+    if p:
+        if p[0] < 4:  cx -= 4
+        elif p[0] > 7: cx += 4
+        if p[1] < 4:  cy -= 4
+        elif p[1] > 7: cy += 4
+        cx = mid(0, cx, MW - 12)
+        cy = mid(0, cy, MH - 12)
+
+def _draw():
+    cls(0)
+    camera(cx, cy)      # scroll the window across the map
+    map()               # draw the big map
+    camera()            # reset for on-screen HUD
+    text(cx, 0, 0, 7)
+`,
+shapes:`# Drawing primitives.
+FPS = 20
+
+def _draw():
+    cls(0)
+    rectfill(1, 1, 4, 4, 8)
+    rect(6, 1, 10, 5, 11)
+    circfill(3, 8, 2, 12)
+    circ(8, 8, 2, 10)
+    line(0, 11, 11, 7, 14)
+    a = t()
+    pset(6 + flr(3 * cos(a)), 10, 7)
+`
+};
+document.getElementById("examples").addEventListener("change",e=>{
+  const code=EXAMPLES[e.target.value]; if(code){ editor.setValue(code); say("loaded example: "+e.target.value); }
+  e.target.value="";
+});
+
 // ---- cartridges (localStorage + file) ------------------------------------
 const CART_KEY="arcade_carts";
 function carts(){ try{return JSON.parse(localStorage.getItem(CART_KEY))||{};}catch(e){return {};} }
 function refreshLoad(){ const sel=document.getElementById("load"); sel.innerHTML='<option value="">Load…</option>';
   Object.keys(carts()).forEach(n=>{ const o=document.createElement("option"); o.value=o.textContent=n; sel.appendChild(o); }); }
 function currentCart(){ return {name:document.getElementById("cartName").value||"untitled",
-  code:editor.getValue(), sprites:sprites}; }
+  code:editor.getValue(), sprites:sprites, map:worldmap}; }
+function blankMap(){ return Array.from({length:MH}, () => Array(MW).fill(null)); }
 function applyCart(c){ document.getElementById("cartName").value=c.name||"untitled";
   editor.setValue(c.code||DEFAULT_CODE);
   sprites=(c.sprites&&c.sprites.length===SPR_N)?c.sprites:sprites.map(s=>s.map(r=>r.map(()=>null)));
-  curSpr=0; bcells.forEach((b,i)=>b.classList.toggle("on",i===0)); renderSprite(); renderAllBank(); }
+  worldmap=(c.map&&c.map.length===MH&&c.map[0].length===MW)?c.map:blankMap();
+  curSpr=0; bcells.forEach((b,i)=>b.classList.toggle("on",i===0));
+  renderSprite(); renderAllBank(); renderMap(); }
 document.getElementById("save").addEventListener("click",()=>{ const all=carts(); const c=currentCart();
   all[c.name]=c; localStorage.setItem(CART_KEY,JSON.stringify(all)); refreshLoad(); say(`saved cart "${c.name}"`); });
 document.getElementById("load").addEventListener("change",e=>{ const c=carts()[e.target.value];
@@ -334,8 +495,11 @@ def _board_reset_last():
 }
 
 function assemble(){
-  const sprJson=JSON.stringify(sprites);
-  return "import json as _cartjson\nSPRITES=_cartjson.loads(r'''"+sprJson+"''')\n"+PREAMBLE+"\n"+editor.getValue()+"\n"+POSTAMBLE;
+  return "import json as _cartjson\n"
+    + "SPRITES=_cartjson.loads(r'''"+JSON.stringify(sprites)+"''')\n"
+    + "MAP=_cartjson.loads(r'''"+JSON.stringify(worldmap)+"''')\n"
+    + "MW="+MW+"\nMH="+MH+"\n"
+    + PREAMBLE+"\n"+editor.getValue()+"\n"+POSTAMBLE;
 }
 function prepare(){
   pyodide.runPython("_captured.clear()");
@@ -388,7 +552,7 @@ boardBtn.addEventListener("click",async()=>{ stop(); consoleEl.textContent="";
     }catch(e){ say(String(e),true); stop(); } },220);
   }catch(e){ say(String(e),true); statusEl.textContent="board connection failed"; } });
 
-renderSprite(); renderAllBank(); refreshLoad();
+renderSprite(); renderAllBank(); renderMap(); refreshLoad();
 boot().catch(e=>{ statusEl.textContent="failed to load"; say(String(e),true); });
 </script>
 </body>
