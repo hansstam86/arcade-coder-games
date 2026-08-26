@@ -140,6 +140,13 @@ APP_INFO = {
             "Right-edge pad toggles a perfect CPU opponent (play solo).",
         ],
     },
+    "ambilight": {
+        "desc": "The board glows your screen's colours.",
+        "use": [
+            "Mirrors a live, blurred average of your Mac screen onto the board.",
+            "Great behind you on camera. Needs Screen Recording; tune brightness/saturation in ambilight.json.",
+        ],
+    },
     "oracle": {
         "desc": "Ask the crystal ball; it answers.",
         "use": [

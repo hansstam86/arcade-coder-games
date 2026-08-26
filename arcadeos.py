@@ -54,6 +54,7 @@ from backdrop import Backdrop
 from studioclock import StudioClock
 from remote import Remote
 from oracle import Oracle
+from ambilight import Ambilight
 import macapps
 import firefox
 
@@ -106,6 +107,7 @@ APPS = [
     ("studioclock", StudioClock, [(255, 45, 45), (240, 240, 235), (240, 240, 235), (255, 45, 45)], (5, 10)),
     ("remote", Remote, [(0, 220, 220), (255, 255, 255), (255, 0, 150), (0, 220, 220)], (5, 10)),
     ("oracle", Oracle, [(150, 0, 255), (255, 210, 60), (255, 210, 60), (150, 0, 255)], (5, 10)),
+    ("ambilight", Ambilight, [(255, 0, 0), (0, 220, 0), (0, 90, 255), (255, 220, 0)], (5, 10)),
 ]
 APP_BY_NAME = {name: cls for name, cls, _i, _p in APPS}
 REGISTRY = {name: (name, cls, icon) for name, cls, icon, _p in APPS}   # all buildable apps
