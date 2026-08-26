@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from arcadecoder import Game, run
+from gameui import draw_mode_splash
 
 N = 8
 OX, OY = 2, 2                      # board's top-left on the 12x12 screen
@@ -127,6 +128,7 @@ class Othello(Game):
         self.winner = None          # None playing, 0 draw, 1/2 winner
         self.over_at = 0.0
         self.flash = None           # (cells, until) recently flipped
+        self.mode_until = time.monotonic() + 1.5      # show CPU/2P splash
 
     def _finish(self):
         d, l = self.board.count(DARK), self.board.count(LIGHT)
@@ -228,6 +230,9 @@ class Othello(Game):
             f = 0.35 + 0.65 * pulse
             mp = tuple(int(ch * f) for ch in mp)
         screen.set(11, 5, mp); screen.set(11, 6, mp)
+
+        if now < self.mode_until:                    # "CPU" / "2P" splash
+            draw_mode_splash(screen, self.vs_cpu)
 
 
 if __name__ == "__main__":
