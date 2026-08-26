@@ -343,6 +343,9 @@ class ArcadeOS(Game):
             self.auto_ambient_from = None
             self.enter(back)
             return
+        if self.app_name == "ambient":                 # tap the idle clock -> home menu
+            self.enter("home")
+            return
         if self.app_name == "home":
             if self._home_pages() > 1:              # page-turn pad (last slot)
                 tx, ty = HOME_SLOTS[-1]
@@ -415,7 +418,8 @@ class ArcadeOS(Game):
         loud = self.bus.level > self.cfg["sound_threshold"]
         if loud:
             self.last_sound = now
-        if self.app_name in ("ambient", "home") and loud:
+        if (self.app_name == "ambient" and loud       # only the idle screen auto-switches,
+                and now - self.last_press > 3.0):     # and only when actually idle (not mid-navigation)
             self.enter("party")
             self.sound_auto = True
             log(f"sound detected (level {self.bus.level:.3f}) — equalizer")
