@@ -132,6 +132,14 @@ APP_INFO = {
             "Bottom gauges = happiness, energy, fullness; it keeps living while away.",
         ],
     },
+    "ttt": {
+        "desc": "Noughts & crosses (tic-tac-toe).",
+        "use": [
+            "Tap a cell to place your mark — X (red) first, then O (cyan).",
+            "Three in a row wins and pulses; tap after a game to replay.",
+            "Right-edge pad toggles a perfect CPU opponent (play solo).",
+        ],
+    },
     "ytmusic": {
         "desc": "A remote for YouTube Music (and other players).",
         "use": [
