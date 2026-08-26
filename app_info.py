@@ -140,6 +140,14 @@ APP_INFO = {
             "Right-edge pad toggles a perfect CPU opponent (play solo).",
         ],
     },
+    "chessclock": {
+        "desc": "A two-player chess clock.",
+        "use": [
+            "Tap your own half to end your move — your clock stops, theirs starts.",
+            "Left middle pad cycles presets (1/3/5/10 min) & resets; right pad pauses.",
+            "Run out of time and your flag falls (you lose). Orange = P1, blue = P2.",
+        ],
+    },
     "dice": {
         "desc": "A fair dice roller for board games.",
         "use": [
