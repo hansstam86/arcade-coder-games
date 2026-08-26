@@ -140,6 +140,13 @@ APP_INFO = {
             "Right-edge pad toggles a perfect CPU opponent (play solo).",
         ],
     },
+    "remote": {
+        "desc": "An AI-controlled canvas.",
+        "use": [
+            "Shows whatever an agent draws via the dashboard's POST /paint.",
+            "Used to let NanoClaw / Claude draw pictures on the board.",
+        ],
+    },
     "studioclock": {
         "desc": "A broadcast-style clock (camera background).",
         "use": [

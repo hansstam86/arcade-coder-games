@@ -95,6 +95,23 @@ class Handler(BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             self._send(400, b"invalid JSON", "text/plain")
             return
+        if self.path == "/paint":               # AI-controlled canvas
+            import remote
+
+            if isinstance(body.get("rows"), list):
+                remote.set_rows(body["rows"])
+            elif isinstance(body.get("pixels"), list):
+                remote.set_pixels(body["pixels"])
+            else:
+                self._send(400, b"need 'rows' (list of strings) or 'pixels'", "text/plain")
+                return
+            if _os is not None:
+                _os.pending_switch = "remote"
+            self._send(200, b"painting", "text/plain")
+            return
+        if self.path == "/say":                  # scroll a message (alias for /marquee)
+            self.path = "/marquee"
+            body.setdefault("show", True)
         if self.path == "/apps":
             from arcadeos import REGISTRY, LAYOUT_PATH
 
