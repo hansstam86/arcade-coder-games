@@ -140,6 +140,13 @@ APP_INFO = {
             "Right-edge pad toggles a perfect CPU opponent (play solo).",
         ],
     },
+    "reactions": {
+        "desc": "A live engagement/reaction meter.",
+        "use": [
+            "Shows a count that climbs with confetti — point it at a LinkedIn post's reactions.",
+            "Drive it with POST /meter {\"count\": N}. Milestones flash the board.",
+        ],
+    },
     "ambilight": {
         "desc": "The board glows your screen's colours.",
         "use": [

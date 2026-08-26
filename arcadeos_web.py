@@ -98,6 +98,14 @@ class Handler(BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             self._send(400, b"invalid JSON", "text/plain")
             return
+        if self.path == "/meter":                # live engagement/reaction meter
+            import reactions
+
+            reactions.set_count(body.get("count", 0), body.get("goal"))
+            if _os is not None and _os.app_name != "reactions":
+                _os.pending_switch = "reactions"   # switch once; then just update live
+            self._send(200, b"ok", "text/plain")
+            return
         if self.path == "/paint":               # AI-controlled canvas
             import remote
 
