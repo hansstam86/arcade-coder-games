@@ -140,6 +140,13 @@ APP_INFO = {
             "Right-edge pad toggles a perfect CPU opponent (play solo).",
         ],
     },
+    "fireworks": {
+        "desc": "A particle firework show.",
+        "use": [
+            "Runs by itself — rockets rise and burst into glowing showers.",
+            "Tap anywhere to launch an extra one from that spot.",
+        ],
+    },
     "reactions": {
         "desc": "A live engagement/reaction meter.",
         "use": [
