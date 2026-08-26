@@ -41,6 +41,7 @@ from countdown import Countdown
 from weather import Weather
 from onair import OnAir
 from ytmusic import YTMusic
+from doodle import Doodle
 import macapps
 import firefox
 
@@ -80,6 +81,7 @@ APPS = [
     ("weather", Weather, [(120, 200, 255), (255, 210, 0), (120, 200, 255), (180, 220, 255)], (5, 10)),
     ("onair", OnAir, [(220, 0, 0), (220, 0, 0), (0, 180, 60), (0, 180, 60)], (5, 10)),
     ("ytmusic", YTMusic, [(230, 0, 0), (255, 255, 255), (230, 0, 0), (230, 0, 0)], (9, 10)),
+    ("doodle", Doodle, [(255, 40, 40), (0, 220, 60), (0, 120, 255), (255, 230, 0)], (5, 10)),
 ]
 APP_BY_NAME = {name: cls for name, cls, _i, _p in APPS}
 REGISTRY = {name: (name, cls, icon) for name, cls, icon, _p in APPS}   # all buildable apps
