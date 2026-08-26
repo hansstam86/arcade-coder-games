@@ -124,6 +124,14 @@ APP_INFO = {
             "Tap anywhere to cycle cities. Edit the list in worldclock.json.",
         ],
     },
+    "pet": {
+        "desc": "A desk pet that lives on your habits.",
+        "use": [
+            "Tap the pet to play, tap the apple (bottom-left) to feed it.",
+            "It naps while your mic is live and at night; neglect makes it hungry.",
+            "Bottom gauges = happiness, energy, fullness; it keeps living while away.",
+        ],
+    },
     "ytmusic": {
         "desc": "A remote for YouTube Music (and other players).",
         "use": [
