@@ -246,6 +246,7 @@ class ArcadeOS(Game):
     VOL_DOWN = (0, 11)
     VOL_UP = (11, 11)
     MUTE_PAD = (6, 11)    # dedicated mute, middle of the bottom row
+    HOME_PAD = (6, 0)     # close/home button — returns to the home grid from any app
     APP_PREV = (0, 0)
     APP_NEXT = (11, 0)
     MAC_PREV = (0, 2)     # 2 rows below the arcade-nav corners
@@ -334,6 +335,11 @@ class ArcadeOS(Game):
         if self.cfg.get("firefox_tab_pads") and not self.in_center and (x, y) in (self.FF_PREV, self.FF_NEXT):
             firefox.switch_tab(1 if (x, y) == self.FF_NEXT else -1)
             self.vol_shown_until = now + 0.6
+            return
+        # close/home pad (top-centre) — leave any app back to the home grid
+        if not self.in_center and self.app_name != "home" and (x, y) == self.HOME_PAD:
+            self.auto_ambient_from = None
+            self.enter("home")
             return
         if self.in_center:                          # a press marks the alert read
             self.center.press(x, y)
@@ -456,6 +462,8 @@ class ArcadeOS(Game):
             if self.notify:
                 self.notify.draw_overlay(screen, now)
         self._draw_volume(screen, now)              # dedicated volume pads on top
+        if self.app_name != "home" and not self.in_center:   # close/home pad (top-centre)
+            screen.set(*self.HOME_PAD, (230, 230, 230))
         if self.cfg.get("nav_pads"):                # arcade app prev/next (top corners)
             screen.set(*self.APP_PREV, (180, 60, 220))   # ‹ prev (purple)
             screen.set(*self.APP_NEXT, (180, 60, 220))   # › next
