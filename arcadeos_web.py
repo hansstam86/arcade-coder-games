@@ -96,19 +96,16 @@ class Handler(BaseHTTPRequestHandler):
             self._send(400, b"invalid JSON", "text/plain")
             return
         if self.path == "/apps":
-            from arcadeos import REGISTRY, HOME_SLOTS, LAYOUT_PATH
+            from arcadeos import REGISTRY, LAYOUT_PATH
 
             slots = body.get("slots")
             if not isinstance(slots, list):
                 self._send(400, b"slots must be a list", "text/plain")
                 return
             clean, seen = [], set()
-            for i in range(len(HOME_SLOTS)):
-                nm = slots[i] if i < len(slots) else None
+            for nm in slots:                     # variable length; enabled apps in order
                 if nm in REGISTRY and nm not in seen:
                     clean.append(nm); seen.add(nm)
-                else:
-                    clean.append(None)
             LAYOUT_PATH.write_text(json.dumps({"slots": clean}, indent=2) + "\n")
             self._send(200, b"saved", "text/plain")
             return

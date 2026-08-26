@@ -24,6 +24,8 @@
   }
   .cell { border: 1.5px dashed #2c3444; background: #10141c; transition: border-color .12s, background .12s; }
   .cell.empty::after { content: "empty"; color: #3f4757; font-size: 12px; }
+  .cell.add { border-style: dashed; border-color: #2c3444; }
+  .cell.add::after { content: "＋ add"; color: #3f4757; font-size: 12px; }
   .cell.over, .drawer.over { border-color: #4f8cff; background: #17203099; }
   .chip {
     cursor: grab; padding: 10px 8px; background: #1b2130; border: 1px solid #2c3444;
@@ -68,7 +70,7 @@
   </div>
 
   <div class="panel">
-    <h2>Home screen · 3 × 5</h2>
+    <h2>Home screen <span style="color:#5a6474;font-weight:400">· order = grid + cycle order; 14 per page on the board</span></h2>
     <div class="grid" id="grid"></div>
   </div>
 
@@ -155,24 +157,31 @@ function showInfo(name) {
 }
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+function mkCell(cls, onDrop) {
+  const cell = document.createElement('div');
+  cell.className = cls;
+  cell.addEventListener('dragover', e => { e.preventDefault(); cell.classList.add('over'); });
+  cell.addEventListener('dragleave', () => cell.classList.remove('over'));
+  cell.addEventListener('drop', e => { e.preventDefault(); cell.classList.remove('over'); onDrop(); });
+  return cell;
+}
+
 function render() {
   grid.innerHTML = '';
-  for (let i = 0; i < COLS * ROWS; i++) {
-    const cell = document.createElement('div');
-    cell.className = 'cell' + (SLOTS[i] ? '' : ' empty');
-    cell.dataset.index = i;
-    if (SLOTS[i]) cell.appendChild(chip(SLOTS[i], {from:'slot', index:i}));
-    cell.addEventListener('dragover', e => { e.preventDefault(); cell.classList.add('over'); });
-    cell.addEventListener('dragleave', () => cell.classList.remove('over'));
-    cell.addEventListener('drop', e => { e.preventDefault(); cell.classList.remove('over'); dropOnSlot(i); });
+  SLOTS.forEach((name, i) => {
+    const cell = mkCell('cell', () => dropAt(i));
+    cell.appendChild(chip(name, {from:'slot', index:i}));
+    // gold divider before each new 14-app page boundary
+    if (i > 0 && i % (COLS * ROWS - 1) === 0) cell.style.boxShadow = 'inset 3px 0 0 #ffd16688';
     grid.appendChild(cell);
-  }
-  const placed = new Set(SLOTS.filter(Boolean));
+  });
+  grid.appendChild(mkCell('cell add', () => dropAt(SLOTS.length)));  // append target
+  const placed = new Set(SLOTS);
   drawer.innerHTML = '';
   const avail = Object.keys(REGISTRY).filter(n => !placed.has(n));
   if (!avail.length) {
     const e = document.createElement('div'); e.className = 'empty-note';
-    e.textContent = 'All apps are placed.'; drawer.appendChild(e);
+    e.textContent = 'All apps are on the home screen.'; drawer.appendChild(e);
   }
   avail.forEach(n => drawer.appendChild(chip(n, {from:'drawer', name:n})));
   if (selected) document.querySelectorAll('.chip').forEach(el =>
@@ -180,13 +189,14 @@ function render() {
       el.querySelector('.name').textContent === selected));
 }
 
-function dropOnSlot(i) {
+function dropAt(i) {
   if (!drag) return;
   if (drag.from === 'drawer') {
-    SLOTS[i] = drag.name;                         // placing (may overwrite -> old returns to drawer)
+    SLOTS.splice(i, 0, drag.name);                 // enable at position i
   } else {
     const j = drag.index;
-    [SLOTS[i], SLOTS[j]] = [SLOTS[j], SLOTS[i]];   // swap
+    const [item] = SLOTS.splice(j, 1);             // reorder
+    SLOTS.splice(j < i ? i - 1 : i, 0, item);
   }
   drag = null; render(); save();
 }
@@ -195,7 +205,7 @@ drawer.addEventListener('dragover', e => { e.preventDefault(); drawer.classList.
 drawer.addEventListener('dragleave', () => drawer.classList.remove('over'));
 drawer.addEventListener('drop', e => {
   e.preventDefault(); drawer.classList.remove('over');
-  if (drag && drag.from === 'slot') { SLOTS[drag.index] = null; render(); save(); }
+  if (drag && drag.from === 'slot') { SLOTS.splice(drag.index, 1); render(); save(); }
   drag = null;
 });
 
@@ -214,12 +224,11 @@ async function save() {
 }
 
 document.getElementById('reset').addEventListener('click', () => {
-  const all = Object.keys(REGISTRY);
-  SLOTS = Array.from({length: COLS*ROWS}, (_, i) => all[i] || null);
+  SLOTS = Object.keys(REGISTRY);
   render(); save();
 });
 document.getElementById('clear').addEventListener('click', () => {
-  SLOTS = SLOTS.map(() => null); render(); save();
+  SLOTS = []; render(); save();
 });
 
 load();

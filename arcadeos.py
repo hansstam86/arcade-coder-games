@@ -42,6 +42,7 @@ from weather import Weather
 from onair import OnAir
 from ytmusic import YTMusic
 from doodle import Doodle
+from stopwatch import Stopwatch
 import macapps
 import firefox
 
@@ -82,6 +83,7 @@ APPS = [
     ("onair", OnAir, [(220, 0, 0), (220, 0, 0), (0, 180, 60), (0, 180, 60)], (5, 10)),
     ("ytmusic", YTMusic, [(230, 0, 0), (255, 255, 255), (230, 0, 0), (230, 0, 0)], (9, 10)),
     ("doodle", Doodle, [(255, 40, 40), (0, 220, 60), (0, 120, 255), (255, 230, 0)], (5, 10)),
+    ("stopwatch", Stopwatch, [(235, 235, 235), (0, 200, 80), (30, 90, 200), (170, 30, 30)], (5, 10)),
 ]
 APP_BY_NAME = {name: cls for name, cls, _i, _p in APPS}
 REGISTRY = {name: (name, cls, icon) for name, cls, icon, _p in APPS}   # all buildable apps
@@ -96,7 +98,13 @@ LAYOUT_PATH = Path(__file__).resolve().parent / "apps.json"
 
 
 def load_layout_names() -> list:
-    """Return a HOME_SLOTS-length list of app names (or None) for each slot."""
+    """Return the ordered list of enabled app names shown on the home grid.
+
+    apps.json (when present) is the source of truth: its "slots" list names the
+    enabled apps in order; apps not listed are hidden. With no apps.json every
+    registered app is shown, in registry order. The list can be any length —
+    the launcher pages it.
+    """
     names = None
     if LAYOUT_PATH.exists():
         try:
@@ -104,14 +112,11 @@ def load_layout_names() -> list:
         except Exception:
             names = None
     if not isinstance(names, list):
-        names = [n for n, *_ in APPS]                 # default: registry order
+        names = [n for n, *_ in APPS]                 # default: all apps
     out, seen = [], set()
-    for i in range(len(HOME_SLOTS)):
-        nm = names[i] if i < len(names) else None
+    for nm in names:
         if nm in REGISTRY and nm not in seen:
             out.append(nm); seen.add(nm)
-        else:
-            out.append(None)
     return out
 
 
@@ -131,6 +136,7 @@ class ArcadeOS(Game):
                 pass
         self.app = None
         self.app_name = "home"
+        self.home_page = 0
         self.layout_names = load_layout_names()      # slot -> app name (from apps.json)
         self.layout_mtime = LAYOUT_PATH.stat().st_mtime if LAYOUT_PATH.exists() else 0.0
         self.auto_ambient_from: str | None = None
@@ -260,15 +266,31 @@ class ArcadeOS(Game):
         # active where a press isn't otherwise doing interactive work
         return self.in_center or self.app_name in ("home", "ambient", "party", "ytmusic")
 
+    def _placed(self):
+        """All enabled apps as (name, cls, icon), in home order (across pages)."""
+        return [REGISTRY[n] for n in self.layout_names if n in REGISTRY]
+
+    def _home_pages(self) -> int:
+        n = len(self._placed())
+        if n <= len(HOME_SLOTS):
+            return 1
+        per = len(HOME_SLOTS) - 1                      # last slot = page-turn pad
+        return (n + per - 1) // per
+
     def _active(self):
-        """Yield (grid_pos, name, cls, icon) for each app placed on the home grid."""
-        for slot, name in enumerate(self.layout_names):
-            if name in REGISTRY:
-                nm, cls, icon = REGISTRY[name]
-                yield HOME_SLOTS[slot], nm, cls, icon
+        """Yield (grid_pos, name, cls, icon) for the apps on the current page."""
+        placed = self._placed()
+        if len(placed) <= len(HOME_SLOTS):
+            for i, (nm, cls, icon) in enumerate(placed):
+                yield HOME_SLOTS[i], nm, cls, icon
+            return
+        per = len(HOME_SLOTS) - 1
+        page = self.home_page % self._home_pages()
+        for i, (nm, cls, icon) in enumerate(placed[page * per:(page + 1) * per]):
+            yield HOME_SLOTS[i], nm, cls, icon
 
     def _cycle_order(self):
-        return ["home"] + [name for _pos, name, _c, _i in self._active()]
+        return ["home"] + [nm for nm, _c, _i in self._placed()]
 
     def _cycle_app(self, delta: int) -> None:
         order = self._cycle_order()
@@ -320,6 +342,11 @@ class ArcadeOS(Game):
             self.enter(back)
             return
         if self.app_name == "home":
+            if self._home_pages() > 1:              # page-turn pad (last slot)
+                tx, ty = HOME_SLOTS[-1]
+                if tx - 1 <= x <= tx + 2 and ty <= y <= ty + 1:
+                    self.home_page = (self.home_page + 1) % self._home_pages()
+                    return
             for (bx, by), name, _cls, _icon in self._active():
                 if bx - 1 <= x <= bx + 2 and by <= y <= by + 1:
                     self.enter(name)
@@ -410,7 +437,16 @@ class ArcadeOS(Game):
                 screen.set(x, y, icon[0]); screen.set(x + 1, y, icon[1])
                 screen.set(x, y + 1, icon[2]); screen.set(x + 1, y + 1, icon[3])
             pulse = int(40 + 30 * (0.5 + 0.5 * __import__("math").sin(now * 2)))
-            screen.set(6, 11, (0, pulse, pulse // 2))       # heartbeat
+            pages = self._home_pages()
+            if pages > 1:                               # page-turn pad + page dots
+                tx, ty = HOME_SLOTS[-1]
+                screen.set(tx, ty, (90, 90, 110)); screen.set(tx + 1, ty, (150, 150, 190))
+                screen.set(tx, ty + 1, (150, 150, 190)); screen.set(tx + 1, ty + 1, (90, 90, 110))
+                cur = self.home_page % pages
+                for p in range(pages):
+                    screen.set(3 + p, 11, (pulse + 80,) * 3 if p == cur else (30, 30, 30))
+            else:
+                screen.set(6, 11, (0, pulse, pulse // 2))   # heartbeat
             if self.notify:
                 self.notify.draw_overlay(screen, now)
         self._draw_volume(screen, now)              # dedicated volume pads on top
