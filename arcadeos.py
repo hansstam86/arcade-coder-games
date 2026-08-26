@@ -415,6 +415,7 @@ class ArcadeOS(Game):
         if self.app is not None:
             self.app.update(dt)                     # underlying app keeps running
         # notification center: modal, overrides everything until all are read
+        self.center.tick(now)                       # re-surface due snoozed alerts
         if self.center.has_unread() and not self.in_center:
             self.in_center = True
             log(f"notification center: {self.center.unread()} unread (press to dismiss)")

@@ -123,7 +123,7 @@ class NotifyService:
         """Prefer the on-board notification center; fall back to a scroll."""
         if self.on_notification is not None:
             try:
-                self.on_notification(friendly_app(app), title, body, color)
+                self.on_notification(friendly_app(app), title, body, color, app)
                 return
             except Exception:
                 pass
