@@ -51,6 +51,7 @@ from dice import Dice
 from chessclock import ChessClock
 from sand import Sand
 from backdrop import Backdrop
+from studioclock import StudioClock
 import macapps
 import firefox
 
@@ -100,6 +101,7 @@ APPS = [
     ("chessclock", ChessClock, [(255, 120, 40), (255, 120, 40), (60, 150, 255), (60, 150, 255)], (5, 10)),
     ("sand", Sand, [(230, 200, 110), (30, 110, 255), (140, 90, 40), (255, 120, 0)], (5, 10)),
     ("backdrop", Backdrop, [(0, 200, 130), (120, 0, 220), (0, 120, 255), (255, 90, 0)], (5, 10)),
+    ("studioclock", StudioClock, [(255, 45, 45), (240, 240, 235), (240, 240, 235), (255, 45, 45)], (5, 10)),
 ]
 APP_BY_NAME = {name: cls for name, cls, _i, _p in APPS}
 REGISTRY = {name: (name, cls, icon) for name, cls, icon, _p in APPS}   # all buildable apps

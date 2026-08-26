@@ -140,6 +140,13 @@ APP_INFO = {
             "Right-edge pad toggles a perfect CPU opponent (play solo).",
         ],
     },
+    "studioclock": {
+        "desc": "A broadcast-style clock (camera background).",
+        "use": [
+            "Big HH:MM with a red seconds ring sweeping the border + hour ticks.",
+            "Tap to scroll the date. Stays on; edit clock_24h/accent/brightness in studioclock.json.",
+        ],
+    },
     "backdrop": {
         "desc": "Calm ambient scenes — a camera background.",
         "use": [
