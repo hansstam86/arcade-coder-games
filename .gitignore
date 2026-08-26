@@ -12,3 +12,15 @@ ncread_helper
 NCReader.app/
 bin/
 apps.json
+# per-user runtime app state (auto-created)
+backdrop.json
+countdown.json
+doodle.json
+tamagotchi.json
+weather.json
+studioclock.json
+worldclock.json
+chessclock.json
+dice.json
+onair.json
+pomodoro.json
