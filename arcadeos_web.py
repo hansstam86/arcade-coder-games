@@ -8,10 +8,20 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+import re
+
 import deck_web
-from deck_web import _origin_ok
+from deck_web import _origin_ok as _base_origin_ok
 
 deck_web.ALLOWED_ORIGINS |= {"https://www.linkedin.com", "https://linkedin.com"}
+
+# also accept the phone/tablet on the same LAN (private IP ranges + .local)
+_LAN = re.compile(
+    r"^http://(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.|[\w-]+\.local(:|$))", re.I)
+
+
+def _origin_ok(origin: str) -> bool:
+    return _base_origin_ok(origin) or bool(origin and _LAN.match(origin))
 
 PORT = 7770
 ROOT = Path(__file__).resolve().parent
@@ -179,7 +189,7 @@ def ensure_server(port: int = PORT) -> None:
     global _started
     if _started:
         return
-    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    server = ThreadingHTTPServer(("0.0.0.0", port), Handler)   # LAN-reachable (phone/tablet)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     _started = True
     print(f"[{time.strftime('%H:%M:%S')}] ArcadeOS dashboard: http://127.0.0.1:{port}", flush=True)
