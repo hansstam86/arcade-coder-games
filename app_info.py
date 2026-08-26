@@ -140,6 +140,13 @@ APP_INFO = {
             "Right-edge pad toggles a perfect CPU opponent (play solo).",
         ],
     },
+    "oracle": {
+        "desc": "Ask the crystal ball; it answers.",
+        "use": [
+            "Tap the orb — it swirls while it thinks, then a fortune scrolls in gold.",
+            "Local fortunes by default; set ai:true (+ token) in oracle.json for real Claude.",
+        ],
+    },
     "remote": {
         "desc": "An AI-controlled canvas.",
         "use": [
