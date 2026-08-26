@@ -35,18 +35,34 @@
     display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; }
   .ico span { display:block; }
   .app .nm { font-size:11px; color:#cfd6e2; }
-  .draw { display:flex; gap:16px; flex-wrap:wrap; }
-  .grid { display:grid; grid-template-columns:repeat(12,20px); grid-auto-rows:20px; gap:2px;
-    background:#0b0d12; padding:8px; border-radius:10px; touch-action:none; }
-  .px { width:20px; height:20px; border-radius:3px; background:#000; }
-  .pal { display:grid; grid-template-columns:repeat(5,26px); gap:6px; align-content:flex-start; }
-  .sw { width:26px; height:26px; border-radius:6px; border:2px solid transparent; cursor:pointer; }
+  .draw { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start; }
+  .grid { display:grid; grid-template-columns:repeat(12,1fr); grid-template-rows:repeat(12,1fr);
+    width:min(92vw,360px); aspect-ratio:1; gap:2px; background:#0b0d12; padding:8px; border-radius:12px;
+    touch-action:none; user-select:none; -webkit-user-select:none; }
+  .px { border-radius:3px; background:#000; }
+  .pal { display:flex; flex-wrap:wrap; gap:8px; align-content:flex-start; max-width:min(92vw,360px); }
+  .sw { width:34px; height:34px; border-radius:8px; border:2px solid transparent; cursor:pointer; }
   .sw.on { border-color:#fff; }
   .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
     background:#1d4a2b; color:#b7eec6; padding:8px 16px; border-radius:20px; font-size:13px;
     opacity:0; transition:opacity .2s; pointer-events:none; }
   .toast.show { opacity:1; }
   a { color:#7a86ff; text-decoration:none; }
+  /* phone-optimized */
+  @media (max-width:640px) {
+    body { padding:14px; }
+    h1 { font-size:20px; }
+    .panel { padding:16px 14px; border-radius:16px; }
+    input[type=text] { font-size:17px; padding:13px 14px; }
+    button { padding:13px 18px; font-size:15px; }
+    #send { flex:1; min-width:120px; }
+    .apps { grid-template-columns:repeat(auto-fill,minmax(78px,1fr)); gap:10px; }
+    .app { padding:12px 4px; }
+    .ico { width:30px; height:30px; }
+    .app .nm { font-size:12px; }
+    .sw { width:40px; height:40px; }
+    .row { gap:14px; }
+  }
 </style>
 </head>
 <body>
