@@ -8,7 +8,10 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+import deck_web
 from deck_web import _origin_ok
+
+deck_web.ALLOWED_ORIGINS |= {"https://www.linkedin.com", "https://linkedin.com"}
 
 PORT = 7770
 ROOT = Path(__file__).resolve().parent
@@ -59,6 +62,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, PAGE_APPS.read_bytes(), "text/html; charset=utf-8")
         elif self.path in ("/control", "/control.html"):
             self._send(200, PAGE_CONTROL.read_bytes(), "text/html; charset=utf-8")
+        elif self.path in ("/linkedin", "/linkedin.html"):
+            self._send(200, (ROOT / "arcadeos_linkedin.html").read_bytes(),
+                       "text/html; charset=utf-8")
         elif self.path == "/apps":
             from arcadeos import REGISTRY, load_layout_names
             from app_info import info_for

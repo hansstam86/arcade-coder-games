@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arcade Coder — LinkedIn Meter</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#0d0f14; color:#e8ecf2; padding:24px;
+    font:15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width:760px; margin:0 auto; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .sub { color:#8b94a3; margin:0 0 20px; font-size:13px; }
+  ol { padding-left:20px; } li { margin:8px 0; }
+  .panel { background:#151922; border:1px solid #232a37; border-radius:14px; padding:16px 18px; margin:16px 0; }
+  h2 { font-size:12px; text-transform:uppercase; letter-spacing:.12em; color:#8b94a3; margin:0 0 12px; }
+  pre { background:#0b0d12; border:1px solid #232a37; border-radius:10px; padding:12px;
+    overflow:auto; font:12px ui-monospace, monospace; color:#cfd6e2; max-height:340px; }
+  button { font:600 13px system-ui; color:#e8ecf2; background:#202838; border:1px solid #313b4d;
+    border-radius:9px; padding:9px 16px; cursor:pointer; }
+  button:hover { background:#273143; }
+  button.go { background:#1d4a2b; border-color:#2c6e40; color:#b7eec6; }
+  a { color:#7a86ff; }
+  code { background:#0b0d12; padding:1px 6px; border-radius:5px; }
+  .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+    background:#1d4a2b; color:#b7eec6; padding:8px 16px; border-radius:20px; opacity:0; transition:.2s; }
+  .toast.show { opacity:1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📈 Live LinkedIn → board meter</h1>
+  <p class="sub">Your LinkedIn post's reaction count, streamed onto the Arcade Coder in real time.</p>
+
+  <div class="panel">
+    <h2>Setup (one time, ~1 min)</h2>
+    <ol>
+      <li>Install the <a href="https://www.tampermonkey.net/" target="_blank">Tampermonkey</a> extension in Chrome (free). A page script can't reach your board directly — LinkedIn blocks it — but Tampermonkey's privileged requests can.</li>
+      <li>Click the Tampermonkey icon → <b>Create a new script</b>, delete the template, and paste the script below (use the copy button).</li>
+      <li>Save it (<code>File → Save</code> or ⌘S).</li>
+    </ol>
+  </div>
+
+  <div class="panel">
+    <h2>Use it</h2>
+    <ol>
+      <li>Open <b>your post on its own page</b> (click the post's timestamp so it's the only post on screen — that makes the count unambiguous).</li>
+      <li>The board switches to the reaction meter and starts climbing within a few seconds. A tiny "▶ board" badge in the corner shows it's live; click it to pause.</li>
+    </ol>
+    <p class="sub">The script only reads the number on a page you're already viewing and pushes it to <code>127.0.0.1</code> on your own Mac — nothing leaves your machine.</p>
+  </div>
+
+  <div class="panel">
+    <h2>The script <button class="go" onclick="copyIt()">Copy</button></h2>
+    <pre id="src"></pre>
+  </div>
+</div>
+<div class="toast" id="toast">copied ✓</div>
+
+<script>
+const SCRIPT = String.raw`// ==UserScript==
+// @name         Arcade Coder — LinkedIn reaction meter
+// @namespace    arcade-coder
+// @match        https://www.linkedin.com/*
+// @grant        GM_xmlhttpRequest
+// @connect      127.0.0.1
+// @version      1.0
+// ==/UserScript==
+(function () {
+  const BOARD = 'http://127.0.0.1:7770/meter';
+  const GOAL = 100;
+  let running = true, lastSent = -1;
+
+  function parseNum(t) {
+    t = (t || '').replace(/,/g, '').trim();
+    const m = t.match(/([\d.]+)\s*([km]?)/i);
+    if (!m) return null;
+    let n = parseFloat(m[1]);
+    if (/k/i.test(m[2])) n *= 1e3;
+    if (/m/i.test(m[2])) n *= 1e6;
+    return isFinite(n) ? Math.round(n) : null;
+  }
+
+  // best-effort: find the reaction count on the (single) post in view
+  function findCount() {
+    const q = document.querySelector(
+      '.social-details-social-counts__reactions-count, .social-details-social-counts__count-value');
+    if (q) { const n = parseNum(q.textContent); if (n != null) return n; }
+    let best = null;
+    document.querySelectorAll('[aria-label]').forEach(el => {
+      const m = (el.getAttribute('aria-label') || '')
+        .match(/([\d.,]+\s*[km]?)\s*(reaction|like)/i);
+      if (m) { const n = parseNum(m[1]); if (n != null && (best == null || n > best)) best = n; }
+    });
+    return best;
+  }
+
+  function send() {
+    if (!running) return;
+    const c = findCount();
+    if (c == null || c === lastSent) return;
+    lastSent = c;
+    GM_xmlhttpRequest({
+      method: 'POST', url: BOARD,
+      headers: { 'Content-Type': 'application/json' },
+      data: JSON.stringify({ count: c, goal: GOAL }),
+    });
+    badge.textContent = '▶ board: ' + c;
+  }
+
+  const badge = document.createElement('div');
+  badge.textContent = '▶ board';
+  Object.assign(badge.style, {
+    position: 'fixed', bottom: '16px', right: '16px', zIndex: 99999,
+    background: '#1d4a2b', color: '#b7eec6', font: '600 12px system-ui',
+    padding: '6px 12px', borderRadius: '16px', cursor: 'pointer',
+    boxShadow: '0 4px 16px rgba(0,0,0,.4)',
+  });
+  badge.onclick = () => { running = !running; badge.style.opacity = running ? '1' : '.5'; };
+  document.body.appendChild(badge);
+
+  setInterval(send, 4000);
+  send();
+})();`;
+document.getElementById('src').textContent = SCRIPT;
+function copyIt(){ navigator.clipboard.writeText(SCRIPT).then(()=>{
+  const t=document.getElementById('toast'); t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1400); }); }
+</script>
+</body>
+</html>
