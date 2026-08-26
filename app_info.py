@@ -140,6 +140,14 @@ APP_INFO = {
             "Right-edge pad toggles a perfect CPU opponent (play solo).",
         ],
     },
+    "sand": {
+        "desc": "A falling-sand physics sandbox.",
+        "use": [
+            "Pick an element on the bottom row, then tap the play area to drop it.",
+            "Sand piles & sinks in water, water flows, fire burns wood & is doused by water.",
+            "Bottom row also has an eraser and a clear button.",
+        ],
+    },
     "chessclock": {
         "desc": "A two-player chess clock.",
         "use": [

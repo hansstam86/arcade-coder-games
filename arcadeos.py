@@ -49,6 +49,7 @@ from tictactoe import TicTacToe
 from othello import Othello
 from dice import Dice
 from chessclock import ChessClock
+from sand import Sand
 import macapps
 import firefox
 
@@ -96,6 +97,7 @@ APPS = [
     ("othello", Othello, [(240, 240, 240), (40, 100, 255), (40, 100, 255), (240, 240, 240)], (5, 10)),
     ("dice", Dice, [(150, 25, 25), (255, 255, 255), (255, 255, 255), (25, 45, 150)], (5, 10)),
     ("chessclock", ChessClock, [(255, 120, 40), (255, 120, 40), (60, 150, 255), (60, 150, 255)], (5, 10)),
+    ("sand", Sand, [(230, 200, 110), (30, 110, 255), (140, 90, 40), (255, 120, 0)], (5, 10)),
 ]
 APP_BY_NAME = {name: cls for name, cls, _i, _p in APPS}
 REGISTRY = {name: (name, cls, icon) for name, cls, icon, _p in APPS}   # all buildable apps
