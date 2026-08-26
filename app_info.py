@@ -103,6 +103,27 @@ APP_INFO = {
             "The marker on the left edge shows the current mode.",
         ],
     },
+    "stopwatch": {
+        "desc": "A count-up stopwatch with laps.",
+        "use": [
+            "Centre = start / pause, left pad = lap, right pad = reset.",
+            "A lap flashes its split time in yellow while the clock keeps running.",
+        ],
+    },
+    "doodle": {
+        "desc": "A free-draw sketch pad.",
+        "use": [
+            "Tap the drawing area to paint with the current colour.",
+            "Bottom row: 10-colour palette, then eraser and clear. Your art is saved.",
+        ],
+    },
+    "worldclock": {
+        "desc": "Clocks for several time zones.",
+        "use": [
+            "Shows one city's time with a day/night sky tint; dots mark the city.",
+            "Tap anywhere to cycle cities. Edit the list in worldclock.json.",
+        ],
+    },
     "ytmusic": {
         "desc": "A remote for YouTube Music (and other players).",
         "use": [

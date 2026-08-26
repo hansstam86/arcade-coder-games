@@ -43,6 +43,7 @@ from onair import OnAir
 from ytmusic import YTMusic
 from doodle import Doodle
 from stopwatch import Stopwatch
+from worldclock import WorldClock
 import macapps
 import firefox
 
@@ -84,6 +85,7 @@ APPS = [
     ("ytmusic", YTMusic, [(230, 0, 0), (255, 255, 255), (230, 0, 0), (230, 0, 0)], (9, 10)),
     ("doodle", Doodle, [(255, 40, 40), (0, 220, 60), (0, 120, 255), (255, 230, 0)], (5, 10)),
     ("stopwatch", Stopwatch, [(235, 235, 235), (0, 200, 80), (30, 90, 200), (170, 30, 30)], (5, 10)),
+    ("worldclock", WorldClock, [(0, 120, 255), (255, 60, 0), (0, 220, 80), (255, 200, 0)], (5, 10)),
 ]
 APP_BY_NAME = {name: cls for name, cls, _i, _p in APPS}
 REGISTRY = {name: (name, cls, icon) for name, cls, icon, _p in APPS}   # all buildable apps
