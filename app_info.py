@@ -140,6 +140,14 @@ APP_INFO = {
             "Right-edge pad toggles a perfect CPU opponent (play solo).",
         ],
     },
+    "backdrop": {
+        "desc": "Calm ambient scenes — a camera background.",
+        "use": [
+            "Five slow visuals: aurora, lo-fi rainy window, jellyfish, flow field, lava lamp.",
+            "Tap anywhere to cycle; the name flashes and your choice is remembered.",
+            "Stays on (won't idle away). Set brightness in backdrop.json.",
+        ],
+    },
     "sand": {
         "desc": "A falling-sand physics sandbox.",
         "use": [
