@@ -47,6 +47,7 @@ from worldclock import WorldClock
 from tamagotchi import Tamagotchi
 from tictactoe import TicTacToe
 from othello import Othello
+from dice import Dice
 import macapps
 import firefox
 
@@ -92,6 +93,7 @@ APPS = [
     ("pet", Tamagotchi, [(0, 220, 90), (0, 220, 90), (255, 60, 150), (0, 220, 90)], (5, 10)),
     ("ttt", TicTacToe, [(255, 40, 40), (0, 210, 220), (0, 210, 220), (255, 40, 40)], (5, 10)),
     ("othello", Othello, [(240, 240, 240), (40, 100, 255), (40, 100, 255), (240, 240, 240)], (5, 10)),
+    ("dice", Dice, [(150, 25, 25), (255, 255, 255), (255, 255, 255), (25, 45, 150)], (5, 10)),
 ]
 APP_BY_NAME = {name: cls for name, cls, _i, _p in APPS}
 REGISTRY = {name: (name, cls, icon) for name, cls, icon, _p in APPS}   # all buildable apps

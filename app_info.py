@@ -140,6 +140,14 @@ APP_INFO = {
             "Right-edge pad toggles a perfect CPU opponent (play solo).",
         ],
     },
+    "dice": {
+        "desc": "A fair dice roller for board games.",
+        "use": [
+            "Tap anywhere to roll; the dice tumble then settle.",
+            "Right-edge pad toggles one or two dice.",
+            "Results come from a cryptographic RNG (secrets) — provably fair.",
+        ],
+    },
     "othello": {
         "desc": "Othello / Reversi — flank & flip.",
         "use": [
