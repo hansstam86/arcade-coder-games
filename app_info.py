@@ -140,6 +140,14 @@ APP_INFO = {
             "Right-edge pad toggles a perfect CPU opponent (play solo).",
         ],
     },
+    "othello": {
+        "desc": "Othello / Reversi — flank & flip.",
+        "use": [
+            "Tap a glowing square to place a disc; flanked lines flip to you.",
+            "Dark (blue) first, then Light (white); no move = auto-pass.",
+            "Most discs wins (bottom bar = live score). Right pad toggles a CPU.",
+        ],
+    },
     "ytmusic": {
         "desc": "A remote for YouTube Music (and other players).",
         "use": [

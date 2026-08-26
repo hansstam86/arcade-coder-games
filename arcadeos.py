@@ -46,6 +46,7 @@ from stopwatch import Stopwatch
 from worldclock import WorldClock
 from tamagotchi import Tamagotchi
 from tictactoe import TicTacToe
+from othello import Othello
 import macapps
 import firefox
 
@@ -90,6 +91,7 @@ APPS = [
     ("worldclock", WorldClock, [(0, 120, 255), (255, 60, 0), (0, 220, 80), (255, 200, 0)], (5, 10)),
     ("pet", Tamagotchi, [(0, 220, 90), (0, 220, 90), (255, 60, 150), (0, 220, 90)], (5, 10)),
     ("ttt", TicTacToe, [(255, 40, 40), (0, 210, 220), (0, 210, 220), (255, 40, 40)], (5, 10)),
+    ("othello", Othello, [(240, 240, 240), (40, 100, 255), (40, 100, 255), (240, 240, 240)], (5, 10)),
 ]
 APP_BY_NAME = {name: cls for name, cls, _i, _p in APPS}
 REGISTRY = {name: (name, cls, icon) for name, cls, icon, _p in APPS}   # all buildable apps
