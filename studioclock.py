@@ -26,7 +26,7 @@ from marquee import render_columns
 CONFIG_PATH = Path(__file__).resolve().parent / "studioclock.json"
 W = H = 12
 
-DEFAULT = {"clock_24h": True, "accent": [255, 45, 45], "brightness": 90}
+DEFAULT = {"clock_24h": True, "accent": [255, 45, 45], "brightness": 90, "mirror": True}
 
 FONT = {
     "0": ["111", "101", "101", "101", "111"], "1": ["010", "110", "010", "010", "111"],
@@ -119,6 +119,9 @@ class StudioClock(Game):
         # global brightness
         f = max(0.1, self.cfg.get("brightness", 90) / 100.0)
         screen.px = [tuple(int(c * f) for c in px) for px in screen.px]
+        if self.cfg.get("mirror", True):             # flip for a mirrored webcam
+            p = screen.px
+            screen.px = [p[y * W + (W - 1 - x)] for y in range(H) for x in range(W)]
 
 
 if __name__ == "__main__":

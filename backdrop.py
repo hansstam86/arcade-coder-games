@@ -28,7 +28,7 @@ from marquee import render_columns
 CONFIG_PATH = Path(__file__).resolve().parent / "backdrop.json"
 W = H = 12
 
-DEFAULT = {"scene": "aurora", "brightness": 85}
+DEFAULT = {"scene": "aurora", "brightness": 85, "mirror": True}
 
 
 def hsv(h, s, v):
@@ -247,6 +247,10 @@ class Backdrop(Game):
                     for r in range(5):
                         if cols[ci][r]:
                             screen.set(sx, 3 + r, (255, 255, 255))
+
+        if self.cfg.get("mirror", True):             # flip for a mirrored webcam
+            p = screen.px
+            screen.px = [p[y * W + (W - 1 - x)] for y in range(H) for x in range(W)]
 
 
 if __name__ == "__main__":

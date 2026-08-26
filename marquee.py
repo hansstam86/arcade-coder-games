@@ -29,6 +29,7 @@ DEFAULT = {
     "speed": 7.0,          # pixels per second
     "background": [0, 0, 6],
     "y": 3,                # top row of the 5-tall text (centred-ish)
+    "mirror": False,       # set true if using it as a camera background (mirrored webcam)
 }
 
 # 3x5 proportional-ish font; each glyph is 5 rows of a fixed-width bit string.
@@ -176,6 +177,9 @@ class Marquee(Game):
                         else:
                             color = tuple(self.cfg["color"])
                         screen.set(sx, y0 + r, color)
+        if self.cfg.get("mirror", False):            # flip for a mirrored webcam
+            p = screen.px
+            screen.px = [p[y * 12 + (11 - x)] for y in range(12) for x in range(12)]
 
 
 if __name__ == "__main__":
