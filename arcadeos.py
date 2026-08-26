@@ -57,6 +57,7 @@ from oracle import Oracle
 from ambilight import Ambilight
 from reactions import Reactions
 from fireworks import Fireworks
+from gifplayer import GifPlayer
 import macapps
 import firefox
 
@@ -112,6 +113,7 @@ APPS = [
     ("ambilight", Ambilight, [(255, 0, 0), (0, 220, 0), (0, 90, 255), (255, 220, 0)], (5, 10)),
     ("reactions", Reactions, [(255, 210, 60), (255, 60, 110), (0, 130, 255), (255, 210, 60)], (5, 10)),
     ("fireworks", Fireworks, [(255, 60, 60), (255, 220, 0), (0, 150, 255), (255, 0, 150)], (5, 10)),
+    ("gifs", GifPlayer, [(255, 40, 70), (255, 220, 0), (0, 200, 255), (0, 220, 90)], (5, 10)),
 ]
 APP_BY_NAME = {name: cls for name, cls, _i, _p in APPS}
 REGISTRY = {name: (name, cls, icon) for name, cls, icon, _p in APPS}   # all buildable apps

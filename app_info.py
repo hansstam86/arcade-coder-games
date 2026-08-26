@@ -140,6 +140,13 @@ APP_INFO = {
             "Right-edge pad toggles a perfect CPU opponent (play solo).",
         ],
     },
+    "gifs": {
+        "desc": "Plays animated GIFs on the board.",
+        "use": [
+            "Drop any .gif into the gifs/ folder — it plays looped, downsampled to 12×12.",
+            "Tap to skip to the next GIF. Pixel-art GIFs look best.",
+        ],
+    },
     "fireworks": {
         "desc": "A particle firework show.",
         "use": [
