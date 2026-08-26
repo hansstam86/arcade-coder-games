@@ -14,6 +14,7 @@ PORT = 7770
 ROOT = Path(__file__).resolve().parent
 PAGE = ROOT / "arcadeos_dashboard.html"
 PAGE_APPS = ROOT / "arcadeos_apps.html"
+PAGE_CONTROL = ROOT / "arcadeos_control.html"
 
 _os = None
 _started = False
@@ -56,6 +57,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, PAGE.read_bytes(), "text/html; charset=utf-8")
         elif self.path in ("/apps.html", "/apps.html/"):
             self._send(200, PAGE_APPS.read_bytes(), "text/html; charset=utf-8")
+        elif self.path in ("/control", "/control.html"):
+            self._send(200, PAGE_CONTROL.read_bytes(), "text/html; charset=utf-8")
         elif self.path == "/apps":
             from arcadeos import REGISTRY, load_layout_names
             from app_info import info_for
