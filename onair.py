@@ -34,6 +34,7 @@ W = H = 12
 DEFAULT = {
     "poll_seconds": 2.0,
     "mic_helper": str(BASE / "bin" / "micstate"),
+    "mirror": True,     # flip horizontally so text reads right through a mirrored webcam
 }
 
 MODES = ["auto", "on", "off"]
@@ -129,6 +130,9 @@ class OnAir(Game):
                         v = (1 - d / 3) * b
                         screen.set(x, y, (0, int(180 * v), int(70 * v)))
         screen.set(0, 6, MODE_MARK[self.mode])              # mode marker (left edge)
+        if self.cfg.get("mirror", True):                    # flip for a mirrored webcam
+            px = screen.px
+            screen.px = [px[y * W + (W - 1 - x)] for y in range(H) for x in range(W)]
 
 
 if __name__ == "__main__":
