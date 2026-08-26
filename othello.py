@@ -161,7 +161,7 @@ class Othello(Game):
 
     # -- input ---------------------------------------------------------------
     def on_press(self, x, y):
-        if (x, y) == MODE_PAD:
+        if x == 11 and y in (5, 6):              # CPU toggle (right-edge button)
             self.vs_cpu = not self.vs_cpu
             self._reset()
             log(f"mode: {'vs CPU' if self.vs_cpu else '2 players'}")
@@ -222,7 +222,12 @@ class Othello(Game):
         for x in range(12):
             screen.set(x, 11, DARK_COL if x < split else LIGHT_COL)
 
-        screen.set(*MODE_PAD, (0, 130, 255) if self.vs_cpu else (0, 180, 80))
+        # CPU toggle button (right edge) — pulses at the start to invite a tap
+        mp = (0, 130, 255) if self.vs_cpu else (0, 190, 90)
+        if self.board.count(DARK) + self.board.count(LIGHT) == 4:   # fresh game
+            f = 0.35 + 0.65 * pulse
+            mp = tuple(int(ch * f) for ch in mp)
+        screen.set(11, 5, mp); screen.set(11, 6, mp)
 
 
 if __name__ == "__main__":

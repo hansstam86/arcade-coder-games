@@ -99,7 +99,7 @@ class TicTacToe(Game):
 
     # -- input ---------------------------------------------------------------
     def on_press(self, x, y):
-        if (x, y) == MODE_PAD:                   # toggle CPU + restart
+        if x == 11 and y in (5, 6):              # CPU toggle (right-edge button)
             self.vs_cpu = not self.vs_cpu
             self._reset()
             log(f"mode: {'vs CPU' if self.vs_cpu else '2 players'}")
@@ -170,8 +170,12 @@ class TicTacToe(Game):
             for x in range(11):
                 screen.set(x, 11, tuple(min(255, int(c * pulse)) for c in wc))
 
-        # mode pad (right edge): green = 2P, blue = vs CPU
-        screen.set(*MODE_PAD, (0, 130, 255) if self.vs_cpu else (0, 180, 80))
+        # CPU toggle button (right edge) — pulses on an empty board to invite a tap
+        mp = (0, 130, 255) if self.vs_cpu else (0, 190, 90)
+        if not any(self.board):                  # fresh game
+            f = 0.35 + 0.65 * pulse
+            mp = tuple(int(ch * f) for ch in mp)
+        screen.set(11, 5, mp); screen.set(11, 6, mp)
 
 
 if __name__ == "__main__":
