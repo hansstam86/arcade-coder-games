@@ -59,6 +59,7 @@ from reactions import Reactions
 from fireworks import Fireworks
 from gifplayer import GifPlayer
 from spaces import Spaces
+from aerofocus import AeroFocus
 import macapps
 import firefox
 
@@ -116,6 +117,7 @@ APPS = [
     ("fireworks", Fireworks, [(255, 60, 60), (255, 220, 0), (0, 150, 255), (255, 0, 150)], (5, 10)),
     ("gifs", GifPlayer, [(255, 40, 70), (255, 220, 0), (0, 200, 255), (0, 220, 90)], (5, 10)),
     ("spaces", Spaces, [(255, 40, 40), (0, 220, 90), (0, 120, 255), (200, 0, 255)], (5, 10)),
+    ("focus", AeroFocus, [(0, 60, 90), (0, 200, 255), (0, 200, 255), (0, 60, 90)], (5, 10)),
 ]
 APP_BY_NAME = {name: cls for name, cls, _i, _p in APPS}
 REGISTRY = {name: (name, cls, icon) for name, cls, icon, _p in APPS}   # all buildable apps

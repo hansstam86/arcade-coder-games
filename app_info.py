@@ -147,6 +147,14 @@ APP_INFO = {
             "Tap a tile to jump to that workspace on your Mac.",
         ],
     },
+    "focus": {
+        "desc": "A directional focus pad for AeroSpace / Omachy.",
+        "use": [
+            "The whole board is a D-pad — tap a side to move window focus that way.",
+            "Tap the centre to toggle mode: cyan FOCUS (move highlight) / orange MOVE (drag window).",
+            "After each move it flashes the name of the app you landed on.",
+        ],
+    },
     "gifs": {
         "desc": "Plays animated GIFs on the board.",
         "use": [
