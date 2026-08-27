@@ -46,6 +46,9 @@ class Spaces(Game):
         self.focused = "1"
         self.nonempty = {"1"}
         self.ok = Path(AERO).exists()
+        self.shift = False                           # SHIFT armed = next tap MOVES the window
+        self.flash = None                            # move-confirmation flash (tile origin)
+        self.flash_until = 0.0
         self.busy = False
         self._stop = False
         if self.ok:
@@ -69,11 +72,25 @@ class Spaces(Game):
 
     # -- input ---------------------------------------------------------------
     def on_press(self, x, y):
+        if not self.ok:
+            return
+        if y == 11:                                  # bottom gap row = SHIFT (move-window) toggle
+            self.shift = not self.shift
+            log(f"spaces shift -> {self.shift}")
+            return
         col, row = x // 4, y // 4                    # 3x3 tiles -> workspace 1..9
         if col > 2 or row > 2:
             return
         n = str(row * 3 + col + 1)
-        self.focused = n                             # optimistic
+        if self.shift:                               # send the focused window to workspace n
+            threading.Thread(target=lambda: _aero("move-node-to-workspace", n),
+                             daemon=True).start()
+            self.shift = False                       # shift is one-shot, like tapping the key
+            self.flash = (col * 4, row * 4)
+            self.flash_until = time.monotonic() + 0.45
+            log(f"spaces move-window -> workspace {n}")
+            return
+        self.focused = n                             # optimistic switch
         threading.Thread(target=lambda: _aero("workspace", n), daemon=True).start()
         log(f"spaces -> workspace {n}")
 
@@ -108,6 +125,20 @@ class Spaces(Game):
                 if n == self.focused:                # white corner ticks on the focused one
                     screen.set(col0, row0, (255, 255, 255))
                     screen.set(col0 + 2, row0 + 2, (255, 255, 255))
+                if self.shift:                       # armed: orange pip = "tap to send window here"
+                    screen.set(col0 + 1, row0 + 1, (255, 140, 0))
+
+        if self.flash and now < self.flash_until:    # move confirmation
+            ox, oy = self.flash
+            for dy in range(3):
+                for dx in range(3):
+                    screen.set(ox + dx, oy + dy, (255, 255, 255))
+
+        sp = 0.45 + 0.55 * abs((now * 2.4) % 2 - 1)  # SHIFT strip along the bottom gap row
+        for x in range(W):
+            if x in (0, 6, 11):                      # leave the volume −/mute/+ pads alone
+                continue
+            screen.set(x, 11, (int(255 * sp), int(120 * sp), 0) if self.shift else (35, 35, 40))
 
 
 if __name__ == "__main__":

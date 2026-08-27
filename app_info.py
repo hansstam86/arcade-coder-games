@@ -145,6 +145,7 @@ APP_INFO = {
         "use": [
             "3×3 grid = workspaces 1–9 (numpad layout). Focused one pulses; solid = has windows.",
             "Tap a tile to jump to that workspace on your Mac.",
+            "Tap the bottom strip to arm SHIFT (it pulses orange), then tap a tile to SEND the focused window there.",
         ],
     },
     "focus": {
