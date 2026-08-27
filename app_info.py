@@ -140,6 +140,13 @@ APP_INFO = {
             "Right-edge pad toggles a perfect CPU opponent (play solo).",
         ],
     },
+    "spaces": {
+        "desc": "AeroSpace / Omachy workspace switcher.",
+        "use": [
+            "3×3 grid = workspaces 1–9 (numpad layout). Focused one pulses; solid = has windows.",
+            "Tap a tile to jump to that workspace on your Mac.",
+        ],
+    },
     "gifs": {
         "desc": "Plays animated GIFs on the board.",
         "use": [
