@@ -155,6 +155,14 @@ APP_INFO = {
             "After each move it flashes the name of the app you landed on.",
         ],
     },
+    "layout": {
+        "desc": "AeroSpace / Omachy layout controls.",
+        "use": [
+            "2×3 grid of layout actions — tap a tile to run it (it flashes to confirm).",
+            "Row 1: TILES (tile ⇄) · STACK (accordion ⇄). Row 2: FLOAT (float ⇄) · FULL (fullscreen).",
+            "Row 3: FLATTEN (flatten tree) · EQ (balance sizes).",
+        ],
+    },
     "gifs": {
         "desc": "Plays animated GIFs on the board.",
         "use": [
