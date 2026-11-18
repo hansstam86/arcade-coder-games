@@ -159,6 +159,23 @@ jvandenbos/pixoo-python and virtualabs/pixoo-client.
 Message hot-reloads from `marquee.json`, or set it live from the ArcadeOS
 dashboard's message box (http://127.0.0.1:7770). An ArcadeOS app (cyan icon).
 
+## Studio Sign — TV broadcast cue sign
+
+[studio.py](studio.py): the board becomes the gallery sign — `ON AIR` in
+pulsing red with stacked letters, `APPLAUSE` flashing gold (auto-returns to
+the previous cue), `COMMERCIAL BREAK`, `BACK TO THE STUDIO`, `STAND BY`,
+`QUIET PLEASE`, `REHEARSAL`, `REPLAY`, `BREAKING NEWS`. Press the right
+half of the board to advance to the next cue, the left half to go back;
+the left column marks your position in the deck. The whole cue deck
+hot-reloads from `studio.json` — re-word cues, recolour them, add your
+own. An ArcadeOS app (red/gold icon); it reports `busy`, so idle mode
+never switches a live sign off.
+
+```bash
+python studio.py          # emulator
+python studio.py --hw     # real board
+```
+
 ## Party mode — the board dances to live audio
 
 [party.py](party.py): a 12-band spectrum analyzer with peak-hold dots, a

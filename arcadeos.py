@@ -54,6 +54,7 @@ from backdrop import Backdrop
 from studioclock import StudioClock
 from remote import Remote
 from oracle import Oracle
+from studio import Studio
 from ambilight import Ambilight
 from reactions import Reactions
 from fireworks import Fireworks
@@ -61,8 +62,16 @@ from gifplayer import GifPlayer
 from spaces import Spaces
 from aerofocus import AeroFocus
 from layoutctl import LayoutCtl
-import macapps
-import firefox
+try:                     # mac-only pads; absent on other platforms (no Quartz)
+    import macapps
+except Exception:        # noqa: BLE001
+    macapps = None
+if sys.platform != "darwin":   # imports fine anywhere but needs osascript
+    macapps = None
+try:
+    import firefox
+except Exception:        # noqa: BLE001
+    firefox = None
 
 CONFIG_PATH = Path(__file__).resolve().parent / "arcadeos.json"
 
@@ -111,6 +120,7 @@ APPS = [
     ("sand", Sand, [(230, 200, 110), (30, 110, 255), (140, 90, 40), (255, 120, 0)], (5, 10)),
     ("backdrop", Backdrop, [(0, 200, 130), (120, 0, 220), (0, 120, 255), (255, 90, 0)], (5, 10)),
     ("studioclock", StudioClock, [(255, 45, 45), (240, 240, 235), (240, 240, 235), (255, 45, 45)], (5, 10)),
+    ("studio", Studio, [(220, 0, 0), (220, 0, 0), (255, 210, 40), (255, 210, 40)], (5, 10)),
     ("remote", Remote, [(0, 220, 220), (255, 255, 255), (255, 0, 150), (0, 220, 220)], (5, 10)),
     ("oracle", Oracle, [(150, 0, 255), (255, 210, 60), (255, 210, 60), (150, 0, 255)], (5, 10)),
     ("ambilight", Ambilight, [(255, 0, 0), (0, 220, 0), (0, 90, 255), (255, 220, 0)], (5, 10)),
@@ -361,12 +371,12 @@ class ArcadeOS(Game):
             self._cycle_app(1 if (x, y) == self.APP_NEXT else -1)
             return
         # mac-app switch pads (top edge, inside the nav pads) — like Cmd-Tab
-        if self.cfg.get("mac_nav_pads") and not self.in_center and (x, y) in (self.MAC_PREV, self.MAC_NEXT):
+        if macapps is not None and self.cfg.get("mac_nav_pads") and not self.in_center and (x, y) in (self.MAC_PREV, self.MAC_NEXT):
             macapps.switch(1 if (x, y) == self.MAC_NEXT else -1)
             self.vol_shown_until = now + 0.6      # brief flash on the pad
             return
         # firefox tab-switch pads (side edges) — like Cmd-Option-Arrow
-        if self.cfg.get("firefox_tab_pads") and not self.in_center and (x, y) in (self.FF_PREV, self.FF_NEXT):
+        if firefox is not None and self.cfg.get("firefox_tab_pads") and not self.in_center and (x, y) in (self.FF_PREV, self.FF_NEXT):
             firefox.switch_tab(1 if (x, y) == self.FF_NEXT else -1)
             self.vol_shown_until = now + 0.6
             return
@@ -502,10 +512,10 @@ class ArcadeOS(Game):
         if self.cfg.get("nav_pads"):                # arcade app prev/next (top corners)
             screen.set(*self.APP_PREV, (180, 60, 220))   # ‹ prev (purple)
             screen.set(*self.APP_NEXT, (180, 60, 220))   # › next
-        if self.cfg.get("mac_nav_pads"):            # mac app prev/next (2 rows below nav)
+        if macapps is not None and self.cfg.get("mac_nav_pads"):   # mac app prev/next (2 rows below nav)
             screen.set(*self.MAC_PREV, (255, 120, 0))    # ‹ mac prev (orange)
             screen.set(*self.MAC_NEXT, (255, 120, 0))    # › mac next
-        if self.cfg.get("firefox_tab_pads"):        # firefox tab prev/next (2 rows below mac)
+        if firefox is not None and self.cfg.get("firefox_tab_pads"):  # firefox tab prev/next (2 rows below mac)
             screen.set(*self.FF_PREV, (0, 200, 220))     # ‹ tab prev (cyan)
             screen.set(*self.FF_NEXT, (0, 200, 220))     # › tab next
         if self.pixoo:

@@ -9,8 +9,12 @@ responds, even in the background.
 
 from __future__ import annotations
 
-import Quartz
-from AppKit import NSEvent
+try:                     # pyobjc (macOS only); transport buttons no-op elsewhere
+    import Quartz
+    from AppKit import NSEvent
+except Exception:        # noqa: BLE001
+    Quartz = None
+    NSEvent = None
 
 NX_PLAY = 16
 NX_NEXT = 17
@@ -20,6 +24,8 @@ NX_REWIND = 20    # seek backward
 
 
 def _post(key: int) -> None:
+    if Quartz is None or NSEvent is None:
+        return           # not macOS — no HID tap to post to
     for down in (True, False):
         flags = 0xA00 if down else 0xB00
         data1 = (key << 16) | ((0xA if down else 0xB) << 8)

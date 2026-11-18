@@ -45,5 +45,5 @@ curl -s http://127.0.0.1:7770/status
 ## Apps you can launch
 games, deck, kopads, seq, midiviz, rhythm, ambient, party, marquee, pomodoro,
 countdown, weather, onair, ytmusic, doodle, stopwatch, worldclock, pet, ttt,
-othello, dice, chessclock, sand, backdrop, studioclock, remote — plus `home`.
-`/paint` automatically switches to the `remote` canvas app.
+othello, dice, chessclock, sand, backdrop, studioclock, remote, studio — plus
+`home`. `/paint` automatically switches to the `remote` canvas app.
